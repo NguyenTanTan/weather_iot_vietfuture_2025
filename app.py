@@ -3,7 +3,6 @@ import firebase_admin
 from firebase_admin import credentials, db
 import os
 from dotenv import load_dotenv
-import csv
 from datetime import datetime, timedelta
 import json
 
@@ -76,50 +75,6 @@ def initialize_firebase():
 # Initialize Firebase
 db_ref = initialize_firebase()
 
-# Load weather data from CSV
-def load_weather_data():
-    """Load weather data from CSV file"""
-    try:
-        data = []
-        with open('Firebase Data - Historical Data Final.csv', 'r', encoding='utf-8') as file:
-            reader = csv.DictReader(file)
-            for row in reader:
-                try:
-                    # Convert timestamp to datetime
-                    timestamp_ms = int(row['Data timestamp'])
-                    dt = datetime.fromtimestamp(timestamp_ms / 1000)
-                    
-                    # Convert string numbers to float (handle comma decimal separator)
-                    temp = float(str(row['temperature']).replace(',', '.'))
-                    hum = float(str(row['humidity']).replace(',', '.'))
-                    pressure = float(str(row['pressure']).replace(',', '.'))
-                    rain = float(str(row['rain']).replace(',', '.'))
-                    sustain_windSpd = float(str(row['sustain_windSpd']).replace(',', '.'))
-                    sustain_windDir = float(str(row['sustain_windDir']).replace(',', '.'))
-                    gust_windSpd = float(str(row['gust_windSpd']).replace(',', '.'))
-                    gust_windDir = float(str(row['gust_windDir']).replace(',', '.'))
-                    
-                    data.append({
-                        'datetime': dt,
-                        'temperature': temp,
-                        'humidity': hum,
-                        'pressure': pressure,
-                        'rain': rain,
-                        'sustain_windSpd': sustain_windSpd,
-                        'sustain_windDir': sustain_windDir,
-                        'gust_windSpd': gust_windSpd,
-                        'gust_windDir': gust_windDir
-                    })
-                except (ValueError, KeyError) as e:
-                    print(f"Error parsing row: {e}")
-                    continue
-        
-        print(f"✅ Loaded {len(data)} records from CSV")
-        return data
-    except Exception as e:
-        print(f"Error loading CSV: {e}")
-        return []
-
 # Get weather data from Firebase Realtime Database
 def get_firebase_weather_data():
     """Get weather data from Firebase Realtime Database"""
@@ -134,54 +89,64 @@ def get_firebase_weather_data():
         ref = db.reference('0001/push')
         data = ref.get()
         
-        if data:
-            print(f"✅ Tìm thấy dữ liệu tại path '0001/push'")
-            weather_data = []
-            
-            # Convert data to list format
-            if isinstance(data, dict):
-                # Sort by key (timestamp) in descending order to get latest first
-                sorted_keys = sorted(data.keys(), reverse=True)
-                
-                for key in sorted_keys[:50]:  # Get latest 50 records
-                    value = data[key]
-                    if isinstance(value, dict):
-                        value['id'] = key
-                        # Decode actual timestamp from Firebase Push ID
-                        decoded_timestamp = decode_firebase_timestamp(key)
-                        if decoded_timestamp:
-                            # Convert milliseconds to datetime
-                            value['timestamp'] = decoded_timestamp
-                            value['datetime'] = datetime.fromtimestamp(decoded_timestamp / 1000.0)
-                        else:
-                            # Fallback to current time if decoding fails
-                            value['timestamp'] = key
-                            value['datetime'] = datetime.now()
-                        weather_data.append(value)
-            
-            print(f"✅ Lấy được {len(weather_data)} records từ Firebase")
-            if weather_data:
-                print(f"   Sample data: {weather_data[0]}")
-            
-            return weather_data
-        else:
-            print("⚠️ Không tìm thấy dữ liệu tại path '0001/push'")
+        if not data:
+            print("⚠️ Không có dữ liệu từ Firebase")
             return []
+        
+        # Convert Firebase data to list format
+        weather_data = []
+        for push_id, record in data.items():
+            try:
+                # Decode timestamp from push ID
+                timestamp = decode_firebase_timestamp(push_id)
+                if timestamp:
+                    dt = datetime.fromtimestamp(timestamp / 1000)
+                else:
+                    dt = datetime.now()
+                
+                # Extract weather data
+                weather_record = {
+                    'datetime': dt,
+                    'temperature': float(record.get('temperature', 0)),
+                    'humidity': float(record.get('humidity', 0)),
+                    'pressure': float(record.get('pressure', 0)),
+                    'rain': float(record.get('rain', 0)),
+                    'sustain_windSpd': float(record.get('sustain_windSpd', 0)),
+                    'sustain_windDir': float(record.get('sustain_windDir', 0)),
+                    'gust_windSpd': float(record.get('gust_windSpd', 0)),
+                    'gust_windDir': float(record.get('gust_windDir', 0))
+                }
+                weather_data.append(weather_record)
+            except Exception as e:
+                print(f"Error processing record {push_id}: {e}")
+                continue
+        
+        # Sort by datetime (newest first)
+        weather_data.sort(key=lambda x: x['datetime'], reverse=True)
+        
+        print(f"✅ Firebase data loaded: {len(weather_data)} records")
+        return weather_data
         
     except Exception as e:
         print(f"❌ Error getting Firebase data: {e}")
         return []
-'''
-    "gust_windDir": 0,
-        "gust_windSpd": 0,
-        "humidity": 95.2,
-        "id": "0001",
-        "pressure": 1014,
-        "rain": 0,
-        "sustain_windDir": 0,
-        "sustain_windSpd": 0,
-        "temperature": 25.6
-'''
+
+# Default weather data when Firebase is not available
+def get_default_weather_data():
+    """Return default weather data when Firebase is not available"""
+    now = datetime.now()
+    return [{
+        'datetime': now,
+        'temperature': 25.0,
+        'humidity': 65.0,
+        'pressure': 1013.25,
+        'rain': 0.0,
+        'sustain_windSpd': 5.0,
+        'sustain_windDir': 180.0,
+        'gust_windSpd': 8.0,
+        'gust_windDir': 180.0
+    }]
+
 @app.route('/')
 def index():
     """Trang chủ hiển thị dashboard"""
@@ -191,92 +156,39 @@ def index():
 def get_weather_data():
     """API endpoint để lấy dữ liệu thời tiết từ CSV hoặc Firebase"""
     try:
-        # Check if user wants Firebase data
-        use_firebase = request.args.get('source', 'csv').lower() == 'firebase'
-        print(f"🌐 API call: weather-data, source={request.args.get('source', 'csv')}")
+        # Always use Firebase data
+        print("🔥 Sử dụng Firebase data")
+        firebase_data = get_firebase_weather_data()
         
-        if use_firebase and db_ref:
-            print("🔥 Sử dụng Firebase data")
-            # Get data from Firebase
-            firebase_data = get_firebase_weather_data()
-            if firebase_data:
-                # Calculate statistics from Firebase data
-                temps = [item.get('temperature', 0) for item in firebase_data]
-                humidities = [item.get('humidity', 0) for item in firebase_data]
-                pressures = [item.get('pressure', 0) for item in firebase_data]
-                
-                stats = {
-                    'total_records': len(firebase_data),
-                    'latest_temperature': float(temps[0]) if temps else 0,
-                    'latest_humidity': float(humidities[0]) if humidities else 0,
-                    'latest_pressure': float(pressures[0]) if pressures else 0,
-                    'avg_temperature': float(sum(temps) / len(temps)) if temps else 0,
-                    'avg_humidity': float(sum(humidities) / len(humidities)) if humidities else 0,
-                    'max_temperature': float(max(temps)) if temps else 0,
-                    'min_temperature': float(min(temps)) if temps else 0,
-                    'last_update': firebase_data[0].get('datetime', datetime.now()).strftime('%Y-%m-%d %I:%M:%S %p')
-                }
-                
-                print(f"✅ Firebase data processed: {len(firebase_data)} records")
-                return jsonify({
-                    'success': True,
-                    'data': firebase_data,
-                    'stats': stats,
-                    'count': len(firebase_data),
-                    'source': 'firebase'
-                })
-            else:
-                print("⚠️ Firebase data empty, falling back to CSV")
+        if not firebase_data:
+            # Fallback to default data if Firebase is empty
+            print("⚠️ Firebase data empty, falling back to default")
+            firebase_data = get_default_weather_data()
         
-        # Fallback to CSV data
-        print("📄 Sử dụng CSV data")
-        data = load_weather_data()
-        if not data:
-            return jsonify({
-                'success': False,
-                'error': 'Không thể tải dữ liệu CSV'
-            }), 500
+        # Calculate statistics from Firebase data
+        temps = [item.get('temperature', 0) for item in firebase_data]
+        humidities = [item.get('humidity', 0) for item in firebase_data]
+        pressures = [item.get('pressure', 0) for item in firebase_data]
         
-        # Get latest data (last 50 records)
-        latest_data = data[-50:] if len(data) > 50 else data
+        stats = {
+            'total_records': len(firebase_data),
+            'latest_temperature': float(temps[0]) if temps else 0,
+            'latest_humidity': float(humidities[0]) if humidities else 0,
+            'latest_pressure': float(pressures[0]) if pressures else 0,
+            'avg_temperature': float(sum(temps) / len(temps)) if temps else 0,
+            'avg_humidity': float(sum(humidities) / len(humidities)) if humidities else 0,
+            'max_temperature': float(max(temps)) if temps else 0,
+            'min_temperature': float(min(temps)) if temps else 0,
+            'last_update': firebase_data[0].get('datetime', datetime.now()).strftime('%Y-%m-%d %I:%M:%S %p')
+        }
         
-        # Calculate statistics
-        if data:
-            temperatures = [item['temperature'] for item in data]
-            humidities = [item['humidity'] for item in data]
-            pressures = [item['pressure'] for item in data]
-            
-            stats = {
-                'total_records': len(data),
-                'latest_temperature': float(data[-1]['temperature']),
-                'latest_humidity': float(data[-1]['humidity']),
-                'latest_pressure': float(data[-1]['pressure']),
-                'avg_temperature': float(sum(temperatures) / len(temperatures)),
-                'avg_humidity': float(sum(humidities) / len(humidities)),
-                'max_temperature': float(max(temperatures)),
-                'min_temperature': float(min(temperatures)),
-                'last_update': data[-1]['datetime'].strftime('%Y-%m-%d %H:%M:%S')
-            }
-        else:
-            stats = {
-                'total_records': 0,
-                'latest_temperature': 0,
-                'latest_humidity': 0,
-                'latest_pressure': 0,
-                'avg_temperature': 0,
-                'avg_humidity': 0,
-                'max_temperature': 0,
-                'min_temperature': 0,
-                'last_update': 'No data'
-            }
-        
-        print(f"✅ CSV data processed: {len(latest_data)} records")
+        print(f"✅ Firebase data processed: {len(firebase_data)} records")
         return jsonify({
             'success': True,
-            'data': latest_data,
+            'data': firebase_data,
             'stats': stats,
-            'count': len(latest_data),
-            'source': 'csv'
+            'count': len(firebase_data),
+            'source': 'firebase'
         })
     except Exception as e:
         print(f"❌ Error in get_weather_data: {e}")
@@ -289,67 +201,33 @@ def get_weather_data():
 def get_weather_chart_data():
     """API endpoint để lấy dữ liệu cho biểu đồ"""
     try:
-        # Check if user wants Firebase data
-        use_firebase = request.args.get('source', 'csv').lower() == 'firebase'
-        print(f"🌐 API call: weather-chart-data, source={request.args.get('source', 'csv')}")
+        # Always use Firebase data
+        print("🔥 Sử dụng Firebase data cho chart")
+        firebase_data = get_firebase_weather_data()
         
-        if use_firebase and db_ref:
-            print("🔥 Sử dụng Firebase data cho chart")
-            # Get data from Firebase
-            firebase_data = get_firebase_weather_data()
-            if firebase_data:
-                                # Prepare data for charts
-                chart_data_dict = {
-                    'timestamps': [item.get('datetime', '').strftime('%Y-%m-%d %I:%M %p') for item in firebase_data],
-                    'temperature': [item.get('temperature', 0) for item in firebase_data],
-                    'humidity': [item.get('humidity', 0) for item in firebase_data],
-                    'pressure': [item.get('pressure', 0) for item in firebase_data],
-                    'rain': [item.get('rain', 0) for item in firebase_data],
-                    'gust_windSpd': [item.get('gust_windSpd', 0) for item in firebase_data],
-                    'gust_windDir': [item.get('gust_windDir', 0) for item in firebase_data],
-                    'sustain_windSpd': [item.get('sustain_windSpd', 0) for item in firebase_data],
-                    'sustain_windDir': [item.get('sustain_windDir', 0) for item in firebase_data]
-                }
-                
-                print(f"✅ Firebase chart data prepared: {len(chart_data_dict['timestamps'])} points")
-                return jsonify({
-                    'success': True,
-                    'data': chart_data_dict,
-                    'source': 'firebase'
-                })
-            else:
-                print("⚠️ Firebase data empty for chart, falling back to CSV")
-        
-        # Fallback to CSV data
-        print("📄 Sử dụng CSV data cho chart")
-        data = load_weather_data()
-        if not data:
-            return jsonify({
-                'success': False,
-                'error': 'Không thể tải dữ liệu CSV'
-            }), 500
-        
-        # Get last 100 records for chart
-        chart_data = data[-100:] if len(data) > 100 else data
+        if not firebase_data:
+            # Fallback to default data if Firebase is empty
+            print("⚠️ Firebase data empty for chart, falling back to default")
+            firebase_data = get_default_weather_data()
         
         # Prepare data for charts
         chart_data_dict = {
-            'timestamps': [item['datetime'].strftime('%Y-%m-%d %I:%M %p') for item in chart_data],
-            'temperature': [item['temperature'] for item in chart_data],
-            'humidity': [item['humidity'] for item in chart_data],
-            'pressure': [item['pressure'] for item in chart_data],
-            'rain': [item['rain'] for item in chart_data],
-            'gust_windSpd': [item['gust_windSpd'] for item in chart_data],
-            'gust_windDir': [item['gust_windDir'] for item in chart_data],
-            'sustain_windSpd': [item['sustain_windSpd'] for item in chart_data],
-            'sustain_windDir': [item['sustain_windDir'] for item in chart_data]
+            'timestamps': [item.get('datetime', '').strftime('%Y-%m-%d %I:%M %p') for item in firebase_data],
+            'temperature': [item.get('temperature', 0) for item in firebase_data],
+            'humidity': [item.get('humidity', 0) for item in firebase_data],
+            'pressure': [item.get('pressure', 0) for item in firebase_data],
+            'rain': [item.get('rain', 0) for item in firebase_data],
+            'gust_windSpd': [item.get('gust_windSpd', 0) for item in firebase_data],
+            'gust_windDir': [item.get('gust_windDir', 0) for item in firebase_data],
+            'sustain_windSpd': [item.get('sustain_windSpd', 0) for item in firebase_data],
+            'sustain_windDir': [item.get('sustain_windDir', 0) for item in firebase_data]
         }
         
-        print(f"✅ CSV chart data prepared: {len(chart_data_dict['timestamps'])} points")
+        print(f"✅ Firebase chart data prepared: {len(chart_data_dict['timestamps'])} points")
         return jsonify({
             'success': True,
             'data': chart_data_dict,
-            'source': 'csv'
+            'source': 'firebase'
         })
     except Exception as e:
         print(f"❌ Error in get_weather_chart_data: {e}")
@@ -362,101 +240,38 @@ def get_weather_chart_data():
 def get_weather_summary():
     """API endpoint để lấy tổng quan thời tiết"""
     try:
-        # Check if user wants Firebase data
-        use_firebase = request.args.get('source', 'csv').lower() == 'firebase'
-        print(f"🌐 API call: weather-summary, source={request.args.get('source', 'csv')}")
+        # Always use Firebase data
+        print("🔥 Sử dụng Firebase data cho summary")
+        firebase_data = get_firebase_weather_data()
         
-        if use_firebase and db_ref:
-            print("🔥 Sử dụng Firebase data cho summary")
-            # Get latest data from Firebase
-            firebase_data = get_firebase_weather_data()
-            if firebase_data:
-                latest = firebase_data[0]
-                summary = {
-                    'current_temp': float(latest.get('temperature', 0)),
-                    'current_humidity': float(latest.get('humidity', 0)),
-                    'current_pressure': float(latest.get('pressure', 0)),
-                    'today_high': float(max([item.get('temperature', 0) for item in firebase_data])),
-                    'today_low': float(min([item.get('temperature', 0) for item in firebase_data])),
-                    'today_avg_temp': float(sum([item.get('temperature', 0) for item in firebase_data]) / len(firebase_data)),
-                    'today_avg_humidity': float(sum([item.get('humidity', 0) for item in firebase_data]) / len(firebase_data)),
-                    'wind_speed': float(latest.get('sustain_windSpd', 0)),
-                    'wind_direction': float(latest.get('sustain_windDir', 0)),
-                    'rain_today': float(sum([item.get('rain', 0) for item in firebase_data])),
-                    'gust_wind_speed': float(latest.get('gust_windSpd', 0)),
-                    'gust_wind_direction': float(latest.get('gust_windDir', 0)),
-                    'sustain_wind_direction': float(latest.get('sustain_windDir', 0)),
-                    'last_update': latest.get('datetime', datetime.now()).strftime('%I:%M:%S %p')
-                }
-                
-                print(f"✅ Firebase summary prepared: temp={summary['current_temp']}°C")
-                return jsonify({
-                    'success': True,
-                    'summary': summary,
-                    'source': 'firebase'
-                })
-            else:
-                print("⚠️ Firebase data empty for summary, falling back to CSV")
+        if not firebase_data:
+            # Fallback to default data if Firebase is empty
+            print("⚠️ Firebase data empty for summary, falling back to default")
+            firebase_data = get_default_weather_data()
         
-        # Fallback to CSV data
-        print("📄 Sử dụng CSV data cho summary")
-        data = load_weather_data()
-        if not data:
-            return jsonify({
-                'success': False,
-                'error': 'Không thể tải dữ liệu CSV'
-            }), 500
+        latest = firebase_data[0]
+        summary = {
+            'current_temp': float(latest.get('temperature', 0)),
+            'current_humidity': float(latest.get('humidity', 0)),
+            'current_pressure': float(latest.get('pressure', 0)),
+            'today_high': float(max([item.get('temperature', 0) for item in firebase_data])),
+            'today_low': float(min([item.get('temperature', 0) for item in firebase_data])),
+            'today_avg_temp': float(sum([item.get('temperature', 0) for item in firebase_data]) / len(firebase_data)),
+            'today_avg_humidity': float(sum([item.get('humidity', 0) for item in firebase_data]) / len(firebase_data)),
+            'wind_speed': float(latest.get('sustain_windSpd', 0)),
+            'wind_direction': float(latest.get('sustain_windDir', 0)),
+            'rain_today': float(sum([item.get('rain', 0) for item in firebase_data])),
+            'gust_wind_speed': float(latest.get('gust_windSpd', 0)),
+            'gust_wind_direction': float(latest.get('gust_windDir', 0)),
+            'sustain_wind_direction': float(latest.get('sustain_windDir', 0)),
+            'last_update': latest.get('datetime', datetime.now()).strftime('%I:%M:%S %p')
+        }
         
-        # Get today's data
-        today = datetime.now().date()
-        today_data = [item for item in data if item['datetime'].date() == today]
-        
-        if len(today_data) == 0:
-            # If no data for today, get last 24 hours
-            yesterday = datetime.now() - timedelta(days=1)
-            today_data = [item for item in data if item['datetime'] >= yesterday]
-        
-        if data:
-            latest = data[-1]
-            summary = {
-                'current_temp': float(latest['temperature']),
-                'current_humidity': float(latest['humidity']),
-                'current_pressure': float(latest['pressure']),
-                'today_high': float(max([item['temperature'] for item in today_data])) if today_data else 0,
-                'today_low': float(min([item['temperature'] for item in today_data])) if today_data else 0,
-                'today_avg_temp': float(sum([item['temperature'] for item in today_data]) / len(today_data)) if today_data else 0,
-                'today_avg_humidity': float(sum([item['humidity'] for item in today_data]) / len(today_data)) if today_data else 0,
-                'wind_speed': float(latest['sustain_windSpd']),
-                'wind_direction': float(latest['sustain_windDir']),
-                'rain_today': float(sum([item['rain'] for item in today_data])) if today_data else 0,
-                'gust_wind_speed': float(latest['gust_windSpd']),
-                'gust_wind_direction': float(latest['gust_windDir']),
-                'sustain_wind_direction': float(latest['sustain_windDir']),
-                'last_update': latest['datetime'].strftime('%I:%M:%S %p')
-            }
-        else:
-            summary = {
-                'current_temp': 0,
-                'current_humidity': 0,
-                'current_pressure': 0,
-                'today_high': 0,
-                'today_low': 0,
-                'today_avg_temp': 0,
-                'today_avg_humidity': 0,
-                'wind_speed': 0,
-                'wind_direction': 0,
-                'rain_today': 0,
-                'gust_wind_speed': 0,
-                'gust_wind_direction': 0,
-                'sustain_wind_direction': 0,
-                'last_update': 'No data'
-            }
-        
-        print(f"✅ CSV summary prepared: temp={summary['current_temp']}°C")
+        print(f"✅ Firebase summary prepared: temp={summary['current_temp']}°C")
         return jsonify({
             'success': True,
             'summary': summary,
-            'source': 'csv'
+            'source': 'firebase'
         })
     except Exception as e:
         print(f"❌ Error in get_weather_summary: {e}")
@@ -469,8 +284,8 @@ def get_weather_summary():
 def get_data_sources():
     """API endpoint để kiểm tra nguồn dữ liệu có sẵn"""
     sources = {
-        'csv': True,
-        'firebase': db_ref is not None
+        'firebase': db_ref is not None,
+        'default': True  # Always available as fallback
     }
     
     print(f"🌐 API call: data-sources, available={sources}")
