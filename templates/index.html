@@ -1,0 +1,1570 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather Dashboard - Monitoring System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            --success-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            --warning-gradient: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+            --danger-gradient: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+            --dark-bg: #0f0f23;
+            --card-bg: rgba(255, 255, 255, 0.95);
+            --text-primary: #2c3e50;
+            --text-secondary: #6c757d;
+            --border-radius: 20px;
+            --shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            --shadow-hover: 0 20px 60px rgba(0, 0, 0, 0.15);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: var(--primary-gradient);
+            min-height: 100vh;
+            font-family: 'Inter', sans-serif;
+            color: var(--text-primary);
+            overflow-x: hidden;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        /* Header Styles */
+        .header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 1rem 0;
+            position: sticky;
+            top: 0;
+            z-index: 998;
+        }
+
+        .navbar-brand {
+            font-weight: 700;
+            font-size: 1.5rem;
+            background: linear-gradient(45deg, #fff, #f0f0f0);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* Card Styles */
+        .dashboard-card {
+            background: var(--card-bg);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: hidden;
+            position: relative;
+            color: var(--text-primary);
+        }
+
+        .dashboard-card h5 {
+            color: var(--text-primary) !important;
+            font-weight: 600;
+        }
+
+        .dashboard-card p {
+            color: var(--text-primary);
+        }
+
+        .dashboard-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--primary-gradient);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .dashboard-card:hover {
+            transform: translateY(-8px);
+            box-shadow: var(--shadow-hover);
+        }
+
+        .dashboard-card:hover::before {
+            opacity: 1;
+        }
+
+        /* Weather Summary Card */
+        .weather-summary {
+            background: var(--primary-gradient);
+            color: white;
+            border-radius: var(--border-radius);
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .weather-summary::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            animation: float 6s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-20px) rotate(180deg); }
+        }
+
+        .weather-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2));
+        }
+
+        .temp-current {
+            font-size: 3rem;
+            font-weight: 700;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        /* Stats Cards */
+        .stats-card {
+            text-align: center;
+            padding: 2rem 1rem;
+            position: relative;
+        }
+
+        .stats-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .stats-label {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .temp-high { background: var(--danger-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .temp-low { background: var(--success-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+        /* Button Styles */
+        .btn-custom {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 25px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .btn-custom:hover {
+            background: rgba(255, 255, 255, 0.3);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+        }
+
+        .btn-custom.active {
+            background: rgba(255, 255, 255, 0.4);
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+
+        .refresh-btn {
+            background: var(--success-gradient);
+            border: none;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 25px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .refresh-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        /* Weather Items */
+        .weather-item {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            margin-bottom: 1rem;
+            padding: 1.5rem;
+            border-left: 4px solid #667eea;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            color: #2c3e50;
+            font-weight: 500;
+        }
+
+        .weather-item h6 {
+            color: #1a1a1a !important;
+            font-weight: 600;
+        }
+
+        .weather-item strong {
+            color: #2c3e50 !important;
+            font-weight: 600;
+        }
+
+        .weather-item small {
+            color: #6c757d !important;
+            font-weight: 500;
+        }
+
+        .weather-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(45deg, transparent, rgba(102, 126, 234, 0.05), transparent);
+            transform: translateX(-100%);
+            transition: transform 0.6s ease;
+        }
+
+        .weather-item:hover {
+            background: rgba(255, 255, 255, 1);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+            transform: translateX(5px);
+        }
+
+        .weather-item:hover::before {
+            transform: translateX(100%);
+        }
+
+        /* Chart Container */
+        .chart-container {
+            position: relative;
+            height: 350px;
+            margin: 1rem 0;
+            padding: 1rem;
+            background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
+            border-radius: 15px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        /* Chart Card Styling */
+        .chart-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.9) 100%);
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.2);
+            transition: all 0.4s ease;
+            overflow: hidden;
+        }
+
+        .chart-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+        }
+
+        .chart-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .chart-card:hover::before {
+            opacity: 1;
+        }
+
+        .chart-header {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+            padding: 1rem 1.5rem;
+        }
+
+        .chart-header h5 {
+            margin: 0;
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 1.1rem;
+        }
+
+        .chart-body {
+            padding: 1.5rem;
+        }
+
+        /* Badge Styles */
+        .source-badge {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            z-index: 1000;
+        }
+
+        .firebase-indicator {
+            background: var(--danger-gradient);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 15px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-left: 0.5rem;
+        }
+
+        .csv-indicator {
+            background: var(--success-gradient);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 15px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-left: 0.5rem;
+        }
+
+        /* Loading Animation */
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .spinner-custom {
+            width: 3rem;
+            height: 3rem;
+            border: 3px solid rgba(102, 126, 234, 0.3);
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Error and Success Messages */
+        .error {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+            color: white;
+            border-radius: 15px;
+            padding: 1rem;
+            margin: 1rem 0;
+            border: none;
+            box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
+        }
+
+        .success {
+            background: linear-gradient(135deg, #51cf66, #40c057);
+            color: white;
+            border-radius: 15px;
+            padding: 1rem;
+            margin: 1rem 0;
+            border: none;
+            box-shadow: 0 4px 15px rgba(81, 207, 102, 0.3);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .weather-summary {
+                padding: 1.5rem;
+            }
+            
+            .temp-current {
+                font-size: 2.5rem;
+            }
+            
+            .weather-icon {
+                font-size: 3rem;
+            }
+            
+            .stats-number {
+                font-size: 2rem;
+            }
+            
+            .chart-container {
+                height: 250px;
+            }
+        }
+
+        /* Dark Mode Toggle */
+        .dark-mode-toggle {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: var(--primary-gradient);
+            border: none;
+            color: white;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+            z-index: 999;
+        }
+
+        .dark-mode-toggle:hover {
+            transform: scale(1.1);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+        }
+
+        /* Data Source Indicator */
+        .data-source-indicator {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 25px;
+            padding: 0.75rem 1.5rem;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+            color: #2c3e50;
+            font-weight: 500;
+        }
+
+        /* Wind Direction Animation */
+        .wind-direction {
+            display: inline-block;
+            transition: transform 0.5s ease;
+        }
+
+        /* Pulse Animation for Real-time */
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+
+        /* Dark mode specific styles */
+        body.dark-mode {
+            background: var(--dark-bg) !important;
+        }
+
+        body.dark-mode .dashboard-card {
+            background: rgba(255, 255, 255, 0.15) !important;
+            color: #ffffff !important;
+        }
+
+        body.dark-mode .weather-item {
+            background: rgba(255, 255, 255, 0.15) !important;
+            color: #ffffff !important;
+        }
+
+        body.dark-mode .weather-item h6 {
+            color: #ffffff !important;
+        }
+
+        body.dark-mode .weather-item strong {
+            color: #ffffff !important;
+        }
+
+        body.dark-mode .weather-item small {
+            color: #cccccc !important;
+        }
+
+        body.dark-mode .data-source-indicator {
+            background: rgba(255, 255, 255, 0.15) !important;
+            color: #ffffff !important;
+        }
+
+        body.dark-mode .dashboard-card h5 {
+            color: #ffffff !important;
+        }
+
+        body.dark-mode .dashboard-card p {
+            color: #ffffff !important;
+        }
+
+        /* Improve text contrast in light mode */
+        .weather-item .text-muted {
+            color: #6c757d !important;
+            font-weight: 500;
+        }
+
+        .dashboard-card .text-muted {
+            color: #6c757d !important;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <nav class="navbar navbar-expand-lg header">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-cloud-sun me-2"></i>Weather Dashboard
+            </a>
+            <div class="d-flex align-items-center gap-3">
+                <div class="d-flex gap-2">
+                    <button class="btn btn-custom" id="csvBtn" onclick="switchDataSource('csv')">
+                        <i class="fas fa-file-csv me-1"></i>CSV
+                    </button>
+                    <button class="btn btn-custom" id="firebaseBtn" onclick="switchDataSource('firebase')">
+                        <i class="fas fa-fire me-1"></i>Firebase
+                    </button>
+                </div>
+                <button class="btn refresh-btn me-2" onclick="refreshData()">
+                    <i class="fas fa-sync-alt me-1"></i>Refresh
+                </button>
+                <button class="btn btn-custom" onclick="toggleAutoRefresh()">
+                    <i class="fas fa-clock me-1"></i>Auto
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- Data Source Indicator -->
+        <div class="text-center">
+            <div class="data-source-indicator d-inline-block" id="dataSourceIndicator">
+                <i class="fas fa-file-csv me-1"></i>Dữ liệu từ CSV
+            </div>
+        </div>
+
+        <!-- Weather Summary -->
+        <div class="weather-summary">
+            <div class="row align-items-center">
+                <div class="col-lg-3 col-md-6 text-center mb-3">
+                    <div class="weather-icon" id="weatherIcon">
+                        <i class="fas fa-cloud-sun"></i>
+                    </div>
+                    <h2 class="temp-current" id="currentTemp">--°C</h2>
+                    <p class="mb-0 opacity-75">Nhiệt độ hiện tại</p>
+                </div>
+                <div class="col-lg-3 col-md-6 text-center mb-3">
+                    <h4 class="mb-2"><i class="fas fa-tint me-2"></i>Độ ẩm</h4>
+                    <h3 class="mb-1" id="currentHumidity">--%</h3>
+                    <p class="mb-0 opacity-75">Áp suất: <span id="currentPressure">-- hPa</span></p>
+                </div>
+                <div class="col-lg-3 col-md-6 text-center mb-3">
+                    <h4 class="mb-2"><i class="fas fa-wind me-2"></i>Gió</h4>
+                    <h3 class="mb-1" id="windSpeed">-- km/h</h3>
+                    <p class="mb-0 opacity-75">Hướng: <span id="windDirection">--°</span></p>
+                </div>
+                <div class="col-lg-3 col-md-6 text-center mb-3">
+                    <h4 class="mb-2"><i class="fas fa-cloud-rain me-2"></i>Mưa</h4>
+                    <h3 class="mb-1" id="rainToday">-- mm</h3>
+                    <p class="mb-0 opacity-75">Cập nhật: <span id="lastUpdate">--</span></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Cards -->
+        <div class="row mb-4">
+            <div class="col-lg-3 col-md-6 mb-3">
+                <div class="dashboard-card stats-card">
+                    <div class="stats-number temp-high" id="todayHigh">--°C</div>
+                    <div class="stats-label">Nhiệt độ cao nhất</div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6 mb-3">
+                <div class="dashboard-card stats-card">
+                    <div class="stats-number temp-low" id="todayLow">--°C</div>
+                    <div class="stats-label">Nhiệt độ thấp nhất</div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6 mb-3">
+                <div class="dashboard-card stats-card">
+                    <div class="stats-number" id="avgTemp">--°C</div>
+                    <div class="stats-label">Nhiệt độ trung bình</div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6 mb-3">
+                <div class="dashboard-card stats-card">
+                    <div class="stats-number" id="totalRecords">0</div>
+                    <div class="stats-label">Tổng bản ghi</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Additional Information -->
+        <div class="row mb-4">
+            <div class="col-lg-3 col-md-6 mb-3">
+                <div class="dashboard-card stats-card">
+                    <div class="stats-number" id="rainInfo" style="color: #0dcaf0;">-- mm</div>
+                    <div class="stats-label">Lượng mưa hôm nay</div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6 mb-3">
+                <div class="dashboard-card stats-card">
+                    <div class="stats-number" id="gustWindInfo" style="color: #ff6b35;">-- km/h</div>
+                    <div class="stats-label">Gió giật cao nhất</div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6 mb-3">
+                <div class="dashboard-card stats-card">
+                    <div class="stats-number" id="gustWindDirInfo" style="color: #6f42c1;">--°</div>
+                    <div class="stats-label">Hướng gió giật</div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6 mb-3">
+                <div class="dashboard-card stats-card">
+                    <div class="stats-number" id="sustainWindDirInfo" style="color: #fd7e14;">--°</div>
+                    <div class="stats-label">Hướng gió ổn định</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row 1 -->
+        <div class="row mb-4">
+            <div class="col-lg-6 mb-3">
+                <div class="dashboard-card chart-card">
+                    <div class="chart-header">
+                        <h5>
+                            <i class="fas fa-thermometer-half me-2" style="color: #dc3545;"></i>Nhiệt độ & Độ ẩm
+                        </h5>
+                    </div>
+                    <div class="chart-body">
+                        <div class="chart-container">
+                            <canvas id="tempHumidityChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6 mb-3">
+                <div class="dashboard-card chart-card">
+                    <div class="chart-header">
+                        <h5>
+                            <i class="fas fa-tachometer-alt me-2" style="color: #198754;"></i>Áp suất
+                        </h5>
+                    </div>
+                    <div class="chart-body">
+                        <div class="chart-container">
+                            <canvas id="pressureChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row 2 -->
+        <div class="row mb-4">
+            <div class="col-lg-6 mb-3">
+                <div class="dashboard-card chart-card">
+                    <div class="chart-header">
+                        <h5>
+                            <i class="fas fa-wind me-2" style="color: #ff6b35;"></i>Gió giật (Gust Wind)
+                        </h5>
+                    </div>
+                    <div class="chart-body">
+                        <div class="chart-container">
+                            <canvas id="gustWindChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6 mb-3">
+                <div class="dashboard-card chart-card">
+                    <div class="chart-header">
+                        <h5>
+                            <i class="fas fa-wind me-2" style="color: #28a745;"></i>Gió ổn định (Sustain Wind)
+                        </h5>
+                    </div>
+                    <div class="chart-body">
+                        <div class="chart-container">
+                            <canvas id="sustainWindChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="row">
+            <div class="col-12 mb-3">
+                <div class="dashboard-card">
+                    <div class="card-header bg-transparent border-0 p-3">
+                        <h5 class="mb-0 fw-bold">
+                            <i class="fas fa-database me-2 text-info"></i>Dữ liệu thời tiết gần đây
+                        </h5>
+                    </div>
+                    <div class="card-body p-3">
+                        <div id="loading" class="loading">
+                            <div class="spinner-custom"></div>
+                            <p class="mt-3 text-muted">Đang tải dữ liệu...</p>
+                        </div>
+                        <div id="error" class="error" style="display: none;"></div>
+                        <div id="weatherContainer"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+    </div>
+
+    <!-- Dark Mode Toggle -->
+    <button class="dark-mode-toggle" onclick="toggleDarkMode()" title="Toggle Dark Mode">
+        <i class="fas fa-moon"></i>
+    </button>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let autoRefreshInterval = null;
+        let isAutoRefreshEnabled = false;
+        let tempHumidityChart = null;
+        let pressureChart = null;
+        let gustWindChart = null;
+        let sustainWindChart = null;
+        let currentDataSource = 'csv';
+        let availableSources = { csv: true, firebase: false };
+        let isDarkMode = false;
+
+        // Load data on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            checkDataSources();
+            loadWeatherData();
+            loadWeatherSummary();
+            loadChartData();
+            
+            // Add entrance animations
+            addEntranceAnimations();
+        });
+
+        function addEntranceAnimations() {
+            const cards = document.querySelectorAll('.dashboard-card');
+            cards.forEach((card, index) => {
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(30px)';
+                setTimeout(() => {
+                    card.style.transition = 'all 0.6s ease';
+                    card.style.opacity = '1';
+                    card.style.transform = 'translateY(0)';
+                }, index * 100);
+            });
+        }
+
+        function toggleDarkMode() {
+            isDarkMode = !isDarkMode;
+            const body = document.body;
+            const toggleBtn = document.querySelector('.dark-mode-toggle i');
+            
+            if (isDarkMode) {
+                body.classList.add('dark-mode');
+                body.style.background = 'var(--dark-bg)';
+                body.style.color = '#fff';
+                toggleBtn.className = 'fas fa-sun';
+                document.documentElement.style.setProperty('--card-bg', 'rgba(255, 255, 255, 0.15)');
+                document.documentElement.style.setProperty('--text-primary', '#ffffff');
+            } else {
+                body.classList.remove('dark-mode');
+                body.style.background = 'var(--primary-gradient)';
+                body.style.color = 'var(--text-primary)';
+                toggleBtn.className = 'fas fa-moon';
+                document.documentElement.style.setProperty('--card-bg', 'rgba(255, 255, 255, 0.95)');
+                document.documentElement.style.setProperty('--text-primary', '#2c3e50');
+            }
+        }
+
+        function checkDataSources() {
+            fetch('/api/data-sources')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        availableSources = data.sources;
+                        updateSourceButtons();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking data sources:', error);
+                });
+        }
+
+        function updateSourceButtons() {
+            const csvBtn = document.getElementById('csvBtn');
+            const firebaseBtn = document.getElementById('firebaseBtn');
+            
+            csvBtn.disabled = !availableSources.csv;
+            firebaseBtn.disabled = !availableSources.firebase;
+            
+            if (!availableSources.csv) {
+                csvBtn.style.opacity = '0.5';
+                csvBtn.title = 'CSV không khả dụng';
+            }
+            if (!availableSources.firebase) {
+                firebaseBtn.style.opacity = '0.5';
+                firebaseBtn.title = 'Firebase không khả dụng';
+            }
+        }
+
+        function switchDataSource(source) {
+            if (!availableSources[source]) {
+                showNotification(`Nguồn dữ liệu ${source} không khả dụng`, 'error');
+                return;
+            }
+            
+            currentDataSource = source;
+            updateSourceButtons();
+            updateDataSourceIndicator();
+            
+            // Reload all data with new source
+            loadWeatherData();
+            loadWeatherSummary();
+            loadChartData();
+        }
+
+        function updateDataSourceIndicator() {
+            const indicator = document.getElementById('dataSourceIndicator');
+            if (currentDataSource === 'firebase') {
+                indicator.innerHTML = '<i class="fas fa-fire me-1"></i>Dữ liệu từ Firebase <span class="firebase-indicator pulse">REAL-TIME</span>';
+            } else {
+                indicator.innerHTML = '<i class="fas fa-file-csv me-1"></i>Dữ liệu từ CSV <span class="csv-indicator">STATIC</span>';
+            }
+        }
+
+        function showNotification(message, type = 'info') {
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.className = `alert alert-${type === 'error' ? 'danger' : 'success'} position-fixed`;
+            notification.style.cssText = 'top: 20px; right: 20px; z-index: 997; min-width: 300px;';
+            notification.innerHTML = `
+                <i class="fas fa-${type === 'error' ? 'exclamation-triangle' : 'check-circle'} me-2"></i>
+                ${message}
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Remove after 3 seconds
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+
+        function loadWeatherData() {
+            showLoading('loading');
+            hideError('error');
+            
+            fetch(`/api/weather-data?source=${currentDataSource}`)
+                .then(response => response.json())
+                .then(data => {
+                    hideLoading('loading');
+                    if (data.success) {
+                        displayWeatherData(data.data);
+                        updateStats(data.stats);
+                        updateDataSourceIndicator();
+                    } else {
+                        showError('error', 'Lỗi khi tải dữ liệu: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    hideLoading('loading');
+                    showError('error', 'Lỗi kết nối: ' + error.message);
+                });
+        }
+
+        function loadWeatherSummary() {
+            fetch(`/api/weather-summary?source=${currentDataSource}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        updateWeatherSummary(data.summary);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading weather summary:', error);
+                });
+        }
+
+        function loadChartData() {
+            fetch(`/api/weather-chart-data?source=${currentDataSource}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        createCharts(data.data);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading chart data:', error);
+                });
+        }
+
+        function displayWeatherData(data) {
+            const container = document.getElementById('weatherContainer');
+            
+            if (data.length === 0) {
+                container.innerHTML = '<p class="text-muted text-center py-4">Không có dữ liệu</p>';
+                return;
+            }
+
+            let html = '';
+            data.slice(-10).reverse().forEach((item, index) => {
+                const datetime = new Date(item.datetime).toLocaleString('vi-VN');
+                html += `
+                    <div class="weather-item" style="animation-delay: ${index * 0.1}s;">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <h6 class="mb-2 fw-bold text-primary">${datetime}</h6>
+                                <div class="row g-3">
+                                    <div class="col-6 col-md-3">
+                                        <div class="text-center p-2 rounded" style="background: rgba(220, 53, 69, 0.1);">
+                                            <small class="text-muted d-block">Nhiệt độ</small>
+                                            <strong class="temp-current fs-5">${item.temperature}°C</strong>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <div class="text-center p-2 rounded" style="background: rgba(13, 110, 253, 0.1);">
+                                            <small class="text-muted d-block">Độ ẩm</small>
+                                            <strong class="fs-5">${item.humidity}%</strong>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <div class="text-center p-2 rounded" style="background: rgba(25, 135, 84, 0.1);">
+                                            <small class="text-muted d-block">Áp suất</small>
+                                            <strong class="fs-5">${item.pressure} hPa</strong>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <div class="text-center p-2 rounded" style="background: rgba(255, 193, 7, 0.1);">
+                                            <small class="text-muted d-block">Gió</small>
+                                            <strong class="fs-5">${item.wind_speed || item.sustain_windSpd || 0} km/h</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        function updateWeatherSummary(summary) {
+            document.getElementById('currentTemp').textContent = summary.current_temp + '°C';
+            document.getElementById('currentHumidity').textContent = summary.current_humidity + '%';
+            document.getElementById('currentPressure').textContent = summary.current_pressure + ' hPa';
+            document.getElementById('windSpeed').textContent = summary.wind_speed + ' km/h';
+            document.getElementById('windDirection').textContent = summary.wind_direction + '°';
+            document.getElementById('rainToday').textContent = summary.rain_today + ' mm';
+            document.getElementById('lastUpdate').textContent = summary.last_update;
+            
+            // Update additional information
+            document.getElementById('rainInfo').textContent = summary.rain_today + ' mm';
+            document.getElementById('gustWindInfo').textContent = (summary.gust_wind_speed || 0) + ' km/h';
+            document.getElementById('gustWindDirInfo').textContent = (summary.gust_wind_direction || 0) + '°';
+            document.getElementById('sustainWindDirInfo').textContent = (summary.sustain_wind_direction || 0) + '°';
+            
+            // Update wind direction icon with animation
+            const windIcon = document.querySelector('.wind-direction');
+            if (windIcon) {
+                windIcon.style.transform = `rotate(${summary.wind_direction}deg)`;
+            }
+        }
+
+        function updateStats(stats) {
+            document.getElementById('totalRecords').textContent = stats.total_records;
+            document.getElementById('todayHigh').textContent = stats.max_temperature + '°C';
+            document.getElementById('todayLow').textContent = stats.min_temperature + '°C';
+            document.getElementById('avgTemp').textContent = stats.avg_temperature.toFixed(1) + '°C';
+        }
+
+        function createCharts(chartData) {
+            // Destroy existing charts
+            if (tempHumidityChart) {
+                tempHumidityChart.destroy();
+            }
+            if (pressureChart) {
+                pressureChart.destroy();
+            }
+            if (gustWindChart) {
+                gustWindChart.destroy();
+            }
+            if (sustainWindChart) {
+                sustainWindChart.destroy();
+            }
+
+            // Temperature and Humidity Chart
+            const tempHumidityCtx = document.getElementById('tempHumidityChart').getContext('2d');
+            tempHumidityChart = new Chart(tempHumidityCtx, {
+                type: 'line',
+                data: {
+                    labels: chartData.timestamps,
+                    datasets: [{
+                        label: 'Nhiệt độ (°C)',
+                        data: chartData.temperature,
+                        borderColor: '#dc3545',
+                        backgroundColor: 'rgba(220, 53, 69, 0.2)',
+                        borderWidth: 3,
+                        tension: 0.4,
+                        yAxisID: 'y',
+                        fill: true,
+                        pointBackgroundColor: '#dc3545',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    }, {
+                        label: 'Độ ẩm (%)',
+                        data: chartData.humidity,
+                        borderColor: '#0d6efd',
+                        backgroundColor: 'rgba(13, 110, 253, 0.2)',
+                        borderWidth: 3,
+                        tension: 0.4,
+                        yAxisID: 'y1',
+                        fill: true,
+                        pointBackgroundColor: '#0d6efd',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: {
+                        duration: 2000,
+                        easing: 'easeInOutQuart'
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                font: {
+                                    family: 'Inter',
+                                    size: 12,
+                                    weight: '600'
+                                },
+                                padding: 20,
+                                usePointStyle: true,
+                                pointStyle: 'circle'
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            titleColor: '#fff',
+                            bodyColor: '#fff',
+                            borderColor: 'rgba(255, 255, 255, 0.2)',
+                            borderWidth: 1,
+                            cornerRadius: 8,
+                            displayColors: true
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)',
+                                borderColor: 'rgba(0, 0, 0, 0.1)'
+                            },
+                            ticks: {
+                                font: {
+                                    family: 'Inter',
+                                    size: 10
+                                }
+                            }
+                        },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            grid: {
+                                color: 'rgba(220, 53, 69, 0.1)',
+                                borderColor: 'rgba(220, 53, 69, 0.3)'
+                            },
+                            title: {
+                                display: true,
+                                text: 'Nhiệt độ (°C)',
+                                font: {
+                                    family: 'Inter',
+                                    size: 12,
+                                    weight: '600'
+                                },
+                                color: '#dc3545'
+                            },
+                            ticks: {
+                                font: {
+                                    family: 'Inter',
+                                    size: 10
+                                },
+                                color: '#dc3545'
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            grid: {
+                                drawOnChartArea: false,
+                                color: 'rgba(13, 110, 253, 0.1)',
+                                borderColor: 'rgba(13, 110, 253, 0.3)'
+                            },
+                            title: {
+                                display: true,
+                                text: 'Độ ẩm (%)',
+                                font: {
+                                    family: 'Inter',
+                                    size: 12,
+                                    weight: '600'
+                                },
+                                color: '#0d6efd'
+                            },
+                            ticks: {
+                                font: {
+                                    family: 'Inter',
+                                    size: 10
+                                },
+                                color: '#0d6efd'
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Pressure Chart
+            const pressureCtx = document.getElementById('pressureChart').getContext('2d');
+            pressureChart = new Chart(pressureCtx, {
+                type: 'line',
+                data: {
+                    labels: chartData.timestamps,
+                    datasets: [{
+                        label: 'Áp suất (hPa)',
+                        data: chartData.pressure,
+                        borderColor: '#198754',
+                        backgroundColor: 'rgba(25, 135, 84, 0.3)',
+                        borderWidth: 4,
+                        tension: 0.4,
+                        fill: true,
+                        pointBackgroundColor: '#198754',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointRadius: 5,
+                        pointHoverRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: {
+                        duration: 2000,
+                        easing: 'easeInOutQuart'
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                font: {
+                                    family: 'Inter',
+                                    size: 12,
+                                    weight: '600'
+                                },
+                                padding: 20,
+                                usePointStyle: true,
+                                pointStyle: 'circle'
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            titleColor: '#fff',
+                            bodyColor: '#fff',
+                            borderColor: 'rgba(255, 255, 255, 0.2)',
+                            borderWidth: 1,
+                            cornerRadius: 8,
+                            displayColors: true
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)',
+                                borderColor: 'rgba(0, 0, 0, 0.1)'
+                            },
+                            ticks: {
+                                font: {
+                                    family: 'Inter',
+                                    size: 10
+                                }
+                            }
+                        },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            grid: {
+                                color: 'rgba(25, 135, 84, 0.1)',
+                                borderColor: 'rgba(25, 135, 84, 0.3)'
+                            },
+                            title: {
+                                display: true,
+                                text: 'Áp suất (hPa)',
+                                font: {
+                                    family: 'Inter',
+                                    size: 12,
+                                    weight: '600'
+                                },
+                                color: '#198754'
+                            },
+                            ticks: {
+                                font: {
+                                    family: 'Inter',
+                                    size: 10
+                                },
+                                color: '#198754'
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Gust Wind Chart
+            const gustWindCtx = document.getElementById('gustWindChart').getContext('2d');
+            gustWindChart = new Chart(gustWindCtx, {
+                type: 'line',
+                data: {
+                    labels: chartData.timestamps,
+                    datasets: [{
+                        label: 'Gust Wind Speed (km/h)',
+                        data: chartData.gust_windSpd || [],
+                        borderColor: '#ff6b35',
+                        backgroundColor: 'rgba(255, 107, 53, 0.2)',
+                        borderWidth: 3,
+                        tension: 0.4,
+                        yAxisID: 'y',
+                        fill: true,
+                        pointBackgroundColor: '#ff6b35',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    }, {
+                        label: 'Gust Wind Direction (°)',
+                        data: chartData.gust_windDir || [],
+                        borderColor: '#6f42c1',
+                        backgroundColor: 'rgba(111, 66, 193, 0.2)',
+                        borderWidth: 2,
+                        tension: 0.4,
+                        yAxisID: 'y1',
+                        fill: false,
+                        pointBackgroundColor: '#6f42c1',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointRadius: 3,
+                        pointHoverRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: {
+                        duration: 2000,
+                        easing: 'easeInOutQuart'
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                font: {
+                                    family: 'Inter',
+                                    size: 12,
+                                    weight: '600'
+                                },
+                                padding: 20,
+                                usePointStyle: true,
+                                pointStyle: 'circle'
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            titleColor: '#fff',
+                            bodyColor: '#fff',
+                            borderColor: 'rgba(255, 255, 255, 0.2)',
+                            borderWidth: 1,
+                            cornerRadius: 8,
+                            displayColors: true
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)',
+                                borderColor: 'rgba(0, 0, 0, 0.1)'
+                            },
+                            ticks: {
+                                font: {
+                                    family: 'Inter',
+                                    size: 10
+                                }
+                            }
+                        },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            grid: {
+                                color: 'rgba(255, 107, 53, 0.1)',
+                                borderColor: 'rgba(255, 107, 53, 0.3)'
+                            },
+                            title: {
+                                display: true,
+                                text: 'Tốc độ gió (km/h)',
+                                font: {
+                                    family: 'Inter',
+                                    size: 12,
+                                    weight: '600'
+                                },
+                                color: '#ff6b35'
+                            },
+                            ticks: {
+                                font: {
+                                    family: 'Inter',
+                                    size: 10
+                                },
+                                color: '#ff6b35'
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            grid: {
+                                drawOnChartArea: false,
+                                color: 'rgba(111, 66, 193, 0.1)',
+                                borderColor: 'rgba(111, 66, 193, 0.3)'
+                            },
+                            title: {
+                                display: true,
+                                text: 'Hướng gió (°)',
+                                font: {
+                                    family: 'Inter',
+                                    size: 12,
+                                    weight: '600'
+                                },
+                                color: '#6f42c1'
+                            },
+                            ticks: {
+                                font: {
+                                    family: 'Inter',
+                                    size: 10
+                                },
+                                color: '#6f42c1'
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Sustain Wind Chart
+            const sustainWindCtx = document.getElementById('sustainWindChart').getContext('2d');
+            sustainWindChart = new Chart(sustainWindCtx, {
+                type: 'line',
+                data: {
+                    labels: chartData.timestamps,
+                    datasets: [{
+                        label: 'Sustain Wind Speed (km/h)',
+                        data: chartData.sustain_windSpd || [],
+                        borderColor: '#28a745',
+                        backgroundColor: 'rgba(40, 167, 69, 0.2)',
+                        borderWidth: 3,
+                        tension: 0.4,
+                        yAxisID: 'y',
+                        fill: true,
+                        pointBackgroundColor: '#28a745',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    }, {
+                        label: 'Sustain Wind Direction (°)',
+                        data: chartData.sustain_windDir || [],
+                        borderColor: '#fd7e14',
+                        backgroundColor: 'rgba(253, 126, 20, 0.2)',
+                        borderWidth: 2,
+                        tension: 0.4,
+                        yAxisID: 'y1',
+                        fill: false,
+                        pointBackgroundColor: '#fd7e14',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointRadius: 3,
+                        pointHoverRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: {
+                        duration: 2000,
+                        easing: 'easeInOutQuart'
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                font: {
+                                    family: 'Inter',
+                                    size: 12,
+                                    weight: '600'
+                                },
+                                padding: 20,
+                                usePointStyle: true,
+                                pointStyle: 'circle'
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            titleColor: '#fff',
+                            bodyColor: '#fff',
+                            borderColor: 'rgba(255, 255, 255, 0.2)',
+                            borderWidth: 1,
+                            cornerRadius: 8,
+                            displayColors: true
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)',
+                                borderColor: 'rgba(0, 0, 0, 0.1)'
+                            },
+                            ticks: {
+                                font: {
+                                    family: 'Inter',
+                                    size: 10
+                                }
+                            }
+                        },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            grid: {
+                                color: 'rgba(40, 167, 69, 0.1)',
+                                borderColor: 'rgba(40, 167, 69, 0.3)'
+                            },
+                            title: {
+                                display: true,
+                                text: 'Tốc độ gió (km/h)',
+                                font: {
+                                    family: 'Inter',
+                                    size: 12,
+                                    weight: '600'
+                                },
+                                color: '#28a745'
+                            },
+                            ticks: {
+                                font: {
+                                    family: 'Inter',
+                                    size: 10
+                                },
+                                color: '#28a745'
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            grid: {
+                                drawOnChartArea: false,
+                                color: 'rgba(253, 126, 20, 0.1)',
+                                borderColor: 'rgba(253, 126, 20, 0.3)'
+                            },
+                            title: {
+                                display: true,
+                                text: 'Hướng gió (°)',
+                                font: {
+                                    family: 'Inter',
+                                    size: 12,
+                                    weight: '600'
+                                },
+                                color: '#fd7e14'
+                            },
+                            ticks: {
+                                font: {
+                                    family: 'Inter',
+                                    size: 10
+                                },
+                                color: '#fd7e14'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function refreshData() {
+            loadWeatherData();
+            loadWeatherSummary();
+            loadChartData();
+            showNotification('Dữ liệu đã được làm mới!', 'success');
+        }
+
+        function toggleAutoRefresh() {
+            if (isAutoRefreshEnabled) {
+                clearInterval(autoRefreshInterval);
+                isAutoRefreshEnabled = false;
+                document.querySelector('.btn-custom').innerHTML = '<i class="fas fa-clock me-1"></i>Auto';
+                showNotification('Auto refresh đã tắt', 'info');
+            } else {
+                // Shorter interval for Firebase, longer for CSV
+                const interval = currentDataSource === 'firebase' ? 10000 : 30000; // 10s for Firebase, 30s for CSV
+                autoRefreshInterval = setInterval(refreshData, interval);
+                isAutoRefreshEnabled = true;
+                document.querySelector('.btn-custom').innerHTML = '<i class="fas fa-stop me-1"></i>Stop';
+                showNotification('Auto refresh đã bật', 'success');
+            }
+        }
+
+        function showLoading(elementId) {
+            document.getElementById(elementId).style.display = 'block';
+        }
+
+        function hideLoading(elementId) {
+            document.getElementById(elementId).style.display = 'none';
+        }
+
+        function showError(elementId, message) {
+            const errorElement = document.getElementById(elementId);
+            errorElement.textContent = message;
+            errorElement.style.display = 'block';
+        }
+
+        function hideError(elementId) {
+            document.getElementById(elementId).style.display = 'none';
+        }
+    </script>
+</body>
+</html> 
