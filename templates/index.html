@@ -948,7 +948,26 @@
 
             let html = '';
             data.slice(0, 10).forEach((item, index) => {
-                const datetime = new Date(item.datetime).toLocaleString('vi-VN');
+                // Parse datetime string and format it properly
+                let datetime;
+                try {
+                    if (typeof item.datetime === 'string') {
+                        // Handle ISO string format
+                        datetime = new Date(item.datetime).toLocaleString('vi-VN', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit'
+                        });
+                    } else {
+                        datetime = new Date(item.datetime).toLocaleString('vi-VN');
+                    }
+                } catch (e) {
+                    datetime = 'Thời gian không xác định';
+                }
+                
                 html += `
                     <div class="weather-item" style="animation-delay: ${index * 0.1}s;">
                         <div class="d-flex justify-content-between align-items-start">

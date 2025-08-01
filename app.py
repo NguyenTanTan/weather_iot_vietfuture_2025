@@ -175,6 +175,11 @@ def get_weather_data():
         # Sort data by datetime (newest first) for proper display
         firebase_data.sort(key=lambda x: x.get('datetime', datetime.now()), reverse=True)
         
+        # Convert datetime objects to ISO string format for JSON serialization
+        for item in firebase_data:
+            if isinstance(item.get('datetime'), datetime):
+                item['datetime'] = item['datetime'].isoformat()
+        
         # Calculate statistics from Firebase data
         temps = [item.get('temperature', 0) for item in firebase_data]
         humidities = [item.get('humidity', 0) for item in firebase_data]
@@ -189,7 +194,7 @@ def get_weather_data():
             'avg_humidity': float(sum(humidities) / len(humidities)) if humidities else 0,
             'max_temperature': float(max(temps)) if temps else 0,
             'min_temperature': float(min(temps)) if temps else 0,
-            'last_update': firebase_data[0].get('datetime', datetime.now()).strftime('%Y-%m-%d %I:%M:%S %p')
+            'last_update': firebase_data[0].get('datetime', datetime.now().isoformat())
         }
         
         print(f"✅ Firebase data processed: {len(firebase_data)} records")
