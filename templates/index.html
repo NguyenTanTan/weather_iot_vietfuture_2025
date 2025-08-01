@@ -542,12 +542,9 @@
             </a>
             <div class="d-flex align-items-center gap-3">
                 <div class="d-flex gap-2">
-                    <button class="btn btn-custom" id="csvBtn" onclick="switchDataSource('csv')">
-                        <i class="fas fa-file-csv me-1"></i>CSV
-                    </button>
-                    <button class="btn btn-custom" id="firebaseBtn" onclick="switchDataSource('firebase')">
-                        <i class="fas fa-fire me-1"></i>Firebase
-                    </button>
+                    <span class="btn btn-custom" style="background: var(--success-gradient); color: white;">
+                        <i class="fas fa-fire me-1"></i>Firebase Real-time
+                    </span>
                 </div>
                 <button class="btn refresh-btn me-2" onclick="refreshData()">
                     <i class="fas fa-sync-alt me-1"></i>Refresh
@@ -563,7 +560,7 @@
         <!-- Data Source Indicator -->
         <div class="text-center">
             <div class="data-source-indicator d-inline-block" id="dataSourceIndicator">
-                <i class="fas fa-file-csv me-1"></i>Dữ liệu từ CSV
+                <i class="fas fa-fire me-1"></i>Dữ liệu từ Firebase Real-time
             </div>
         </div>
 
@@ -752,8 +749,8 @@
         let pressureChart = null;
         let gustWindChart = null;
         let sustainWindChart = null;
-        let currentDataSource = 'csv';
-        let availableSources = { csv: true, firebase: false };
+        let currentDataSource = 'firebase';
+        let availableSources = { firebase: true, default: true };
         let isDarkMode = false;
 
         // Load data on page load
@@ -803,59 +800,14 @@
         }
 
         function checkDataSources() {
-            fetch('/api/data-sources')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        availableSources = data.sources;
-                        updateSourceButtons();
-                    }
-                })
-                .catch(error => {
-                    console.error('Error checking data sources:', error);
-                });
-        }
-
-        function updateSourceButtons() {
-            const csvBtn = document.getElementById('csvBtn');
-            const firebaseBtn = document.getElementById('firebaseBtn');
-            
-            csvBtn.disabled = !availableSources.csv;
-            firebaseBtn.disabled = !availableSources.firebase;
-            
-            if (!availableSources.csv) {
-                csvBtn.style.opacity = '0.5';
-                csvBtn.title = 'CSV không khả dụng';
-            }
-            if (!availableSources.firebase) {
-                firebaseBtn.style.opacity = '0.5';
-                firebaseBtn.title = 'Firebase không khả dụng';
-            }
-        }
-
-        function switchDataSource(source) {
-            if (!availableSources[source]) {
-                showNotification(`Nguồn dữ liệu ${source} không khả dụng`, 'error');
-                return;
-            }
-            
-            currentDataSource = source;
-            updateSourceButtons();
+            // Firebase is always available as primary source
+            availableSources = { firebase: true, default: true };
             updateDataSourceIndicator();
-            
-            // Reload all data with new source
-            loadWeatherData();
-            loadWeatherSummary();
-            loadChartData();
         }
 
         function updateDataSourceIndicator() {
             const indicator = document.getElementById('dataSourceIndicator');
-            if (currentDataSource === 'firebase') {
-                indicator.innerHTML = '<i class="fas fa-fire me-1"></i>Dữ liệu từ Firebase <span class="firebase-indicator pulse">REAL-TIME</span>';
-            } else {
-                indicator.innerHTML = '<i class="fas fa-file-csv me-1"></i>Dữ liệu từ CSV <span class="csv-indicator">STATIC</span>';
-            }
+            indicator.innerHTML = '<i class="fas fa-fire me-1"></i>Dữ liệu từ Firebase <span class="firebase-indicator pulse">REAL-TIME</span>';
         }
 
         function showNotification(message, type = 'info') {
@@ -880,7 +832,7 @@
             showLoading('loading');
             hideError('error');
             
-            fetch(`/api/weather-data?source=${currentDataSource}`)
+            fetch('/api/weather-data')
                 .then(response => response.json())
                 .then(data => {
                     hideLoading('loading');
@@ -899,7 +851,7 @@
         }
 
         function loadWeatherSummary() {
-            fetch(`/api/weather-summary?source=${currentDataSource}`)
+            fetch('/api/weather-summary')
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
@@ -912,7 +864,7 @@
         }
 
         function loadChartData() {
-            fetch(`/api/weather-chart-data?source=${currentDataSource}`)
+            fetch('/api/weather-chart-data')
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
