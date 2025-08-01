@@ -40,21 +40,26 @@ def initialize_firebase():
             firebase_creds = os.environ.get('FIREBASE_CREDENTIALS')
             if firebase_creds:
                 import json
-                cred_dict = json.loads(firebase_creds)
-                cred = credentials.Certificate(cred_dict)
-                print("✅ Firebase initialized with environment credentials")
+                try:
+                    cred_dict = json.loads(firebase_creds)
+                    cred = credentials.Certificate(cred_dict)
+                    print("✅ Firebase initialized with environment credentials")
+                except json.JSONDecodeError as e:
+                    print(f"❌ Error parsing FIREBASE_CREDENTIALS: {e}")
+                    return None
             else:
                 # Fallback to local file (for development)
-                cred = credentials.Certificate("firebase-service-account.json")
-                print("✅ Firebase initialized with local file")
+                try:
+                    cred = credentials.Certificate("firebase-service-account.json")
+                    print("✅ Firebase initialized with local file")
+                except FileNotFoundError:
+                    print("⚠️ Firebase service account file not found. Firebase features will be disabled.")
+                    return None
             
             firebase_admin.initialize_app(cred, {
                 'databaseURL': 'https://esp-sensor-station-default-rtdb.asia-southeast1.firebasedatabase.app'
             })
             print("✅ Firebase initialized successfully")
-        except FileNotFoundError:
-            print("⚠️ Firebase service account file not found. Firebase features will be disabled.")
-            return None
         except Exception as e:
             print(f"❌ Firebase initialization failed: {e}")
             return None
