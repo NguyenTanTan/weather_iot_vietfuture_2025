@@ -648,6 +648,30 @@
             </div>
         </div>
 
+        <!-- Chart Time Period Selector -->
+        <div class="row mb-3">
+            <div class="col-12">
+                <div class="dashboard-card">
+                    <div class="d-flex justify-content-between align-items-center p-3">
+                        <h6 class="mb-0">
+                            <i class="fas fa-clock me-2"></i>Chọn khoảng thời gian
+                        </h6>
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="changeChartPeriod('day')" id="dayBtn">
+                                <i class="fas fa-calendar-day me-1"></i>Ngày
+                            </button>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="changeChartPeriod('week')" id="weekBtn">
+                                <i class="fas fa-calendar-week me-1"></i>Tuần
+                            </button>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="changeChartPeriod('month')" id="monthBtn">
+                                <i class="fas fa-calendar-alt me-1"></i>Tháng
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Charts Row 1 -->
         <div class="row mb-4">
             <div class="col-lg-6 mb-3">
@@ -752,6 +776,7 @@
         let currentDataSource = 'firebase';
         let availableSources = { firebase: true, default: true };
         let isDarkMode = false;
+        let currentChartPeriod = 'day'; // Default to day view
 
         // Load data on page load
         document.addEventListener('DOMContentLoaded', function() {
@@ -759,6 +784,7 @@
             loadWeatherData();
             loadWeatherSummary();
             loadChartData();
+            updatePeriodButtons(); // Highlight default period button
             
             // Add entrance animations
             addEntranceAnimations();
@@ -864,7 +890,7 @@
         }
 
         function loadChartData() {
-            fetch('/api/weather-chart-data')
+            fetch(`/api/weather-chart-data/${currentChartPeriod}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
@@ -874,6 +900,42 @@
                 .catch(error => {
                     console.error('Error loading chart data:', error);
                 });
+        }
+
+        function changeChartPeriod(period) {
+            currentChartPeriod = period;
+            updatePeriodButtons();
+            loadChartData();
+        }
+
+        function updatePeriodButtons() {
+            // Reset all buttons
+            document.getElementById('dayBtn').classList.remove('btn-primary');
+            document.getElementById('dayBtn').classList.add('btn-outline-primary');
+            document.getElementById('weekBtn').classList.remove('btn-primary');
+            document.getElementById('weekBtn').classList.add('btn-outline-primary');
+            document.getElementById('monthBtn').classList.remove('btn-primary');
+            document.getElementById('monthBtn').classList.add('btn-outline-primary');
+            
+            // Highlight current period
+            document.getElementById(currentChartPeriod + 'Btn').classList.remove('btn-outline-primary');
+            document.getElementById(currentChartPeriod + 'Btn').classList.add('btn-primary');
+        }
+
+        // Helper function to create better x-axis labels
+        function createTimeLabels(chartData) {
+            return chartData.timestamps.map((time, index) => {
+                const date = chartData.dates[index];
+                if (currentChartPeriod === 'day') {
+                    return [time, date]; // [HH:MM, DD/MM] for day view
+                } else if (currentChartPeriod === 'week') {
+                    return ['', date]; // [empty, DD/MM] for week view
+                } else if (currentChartPeriod === 'month') {
+                    return ['', date]; // [empty, MM/YYYY] for month view
+                } else {
+                    return [time, date]; // Default
+                }
+            });
         }
 
         function displayWeatherData(data) {
@@ -971,12 +1033,15 @@
                 sustainWindChart.destroy();
             }
 
+            // Create better labels for x-axis
+            const timeLabels = createTimeLabels(chartData);
+
             // Temperature and Humidity Chart
             const tempHumidityCtx = document.getElementById('tempHumidityChart').getContext('2d');
             tempHumidityChart = new Chart(tempHumidityCtx, {
                 type: 'line',
                 data: {
-                    labels: chartData.timestamps,
+                    labels: timeLabels,
                     datasets: [{
                         label: 'Nhiệt độ (°C)',
                         data: chartData.temperature,
@@ -1048,6 +1113,21 @@
                                 font: {
                                     family: 'Inter',
                                     size: 10
+                                },
+                                callback: function(value, index) {
+                                    // Show appropriate format based on period
+                                    const time = chartData.timestamps[index];
+                                    const date = chartData.dates[index];
+                                    
+                                    if (currentChartPeriod === 'day') {
+                                        return [time, date]; // [HH:MM, DD/MM]
+                                    } else if (currentChartPeriod === 'week') {
+                                        return ['', date]; // [empty, DD/MM]
+                                    } else if (currentChartPeriod === 'month') {
+                                        return ['', date]; // [empty, MM/YYYY]
+                                    } else {
+                                        return [time, date]; // Default
+                                    }
                                 }
                             }
                         },
@@ -1113,7 +1193,7 @@
             pressureChart = new Chart(pressureCtx, {
                 type: 'line',
                 data: {
-                    labels: chartData.timestamps,
+                    labels: timeLabels,
                     datasets: [{
                         label: 'Áp suất (hPa)',
                         data: chartData.pressure,
@@ -1207,7 +1287,7 @@
             gustWindChart = new Chart(gustWindCtx, {
                 type: 'line',
                 data: {
-                    labels: chartData.timestamps,
+                    labels: timeLabels,
                     datasets: [{
                         label: 'Gust Wind Speed (km/h)',
                         data: chartData.gust_windSpd || [],
@@ -1344,7 +1424,7 @@
             sustainWindChart = new Chart(sustainWindCtx, {
                 type: 'line',
                 data: {
-                    labels: chartData.timestamps,
+                    labels: timeLabels,
                     datasets: [{
                         label: 'Sustain Wind Speed (km/h)',
                         data: chartData.sustain_windSpd || [],

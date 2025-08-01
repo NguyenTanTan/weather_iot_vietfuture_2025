@@ -135,17 +135,24 @@ def get_firebase_weather_data():
 def get_default_weather_data():
     """Return default weather data when Firebase is not available"""
     now = datetime.now()
-    return [{
-        'datetime': now,
-        'temperature': 25.0,
-        'humidity': 65.0,
-        'pressure': 1013.25,
-        'rain': 0.0,
-        'sustain_windSpd': 5.0,
-        'sustain_windDir': 180.0,
-        'gust_windSpd': 8.0,
-        'gust_windDir': 180.0
-    }]
+    data = []
+    
+    # Generate sample data for the last 30 days to test week/month views
+    for i in range(30):
+        dt = now - timedelta(days=i)
+        data.append({
+            'datetime': dt,
+            'temperature': 25.0 + (i % 10) - 5,  # Vary temperature
+            'humidity': 60.0 + (i % 20),  # Vary humidity
+            'pressure': 1013.25 + (i % 10) - 5,  # Vary pressure
+            'rain': (i % 3) * 2.5,  # Some rain days
+            'sustain_windSpd': 5.0 + (i % 8),  # Vary wind speed
+            'sustain_windDir': 180.0 + (i % 180),  # Vary wind direction
+            'gust_windSpd': 8.0 + (i % 12),  # Vary gust wind speed
+            'gust_windDir': 180.0 + (i % 180)  # Vary gust wind direction
+        })
+    
+    return data
 
 @app.route('/')
 def index():
@@ -210,17 +217,21 @@ def get_weather_chart_data():
             print("⚠️ Firebase data empty for chart, falling back to default")
             firebase_data = get_default_weather_data()
         
-        # Prepare data for charts
+        # Get last 10 records for chart
+        chart_data = firebase_data[:10] if len(firebase_data) > 10 else firebase_data
+        
+        # Prepare data for charts with better formatting
         chart_data_dict = {
-            'timestamps': [item.get('datetime', '').strftime('%Y-%m-%d %I:%M %p') for item in firebase_data],
-            'temperature': [item.get('temperature', 0) for item in firebase_data],
-            'humidity': [item.get('humidity', 0) for item in firebase_data],
-            'pressure': [item.get('pressure', 0) for item in firebase_data],
-            'rain': [item.get('rain', 0) for item in firebase_data],
-            'gust_windSpd': [item.get('gust_windSpd', 0) for item in firebase_data],
-            'gust_windDir': [item.get('gust_windDir', 0) for item in firebase_data],
-            'sustain_windSpd': [item.get('sustain_windSpd', 0) for item in firebase_data],
-            'sustain_windDir': [item.get('sustain_windDir', 0) for item in firebase_data]
+            'timestamps': [item.get('datetime', '').strftime('%H:%M') for item in chart_data],
+            'dates': [item.get('datetime', '').strftime('%d/%m') for item in chart_data],
+            'temperature': [item.get('temperature', 0) for item in chart_data],
+            'humidity': [item.get('humidity', 0) for item in chart_data],
+            'pressure': [item.get('pressure', 0) for item in chart_data],
+            'rain': [item.get('rain', 0) for item in chart_data],
+            'gust_windSpd': [item.get('gust_windSpd', 0) for item in chart_data],
+            'gust_windDir': [item.get('gust_windDir', 0) for item in chart_data],
+            'sustain_windSpd': [item.get('sustain_windSpd', 0) for item in chart_data],
+            'sustain_windDir': [item.get('sustain_windDir', 0) for item in chart_data]
         }
         
         print(f"✅ Firebase chart data prepared: {len(chart_data_dict['timestamps'])} points")
@@ -293,6 +304,146 @@ def get_data_sources():
         'success': True,
         'sources': sources
     })
+
+@app.route('/api/weather-chart-data/<period>')
+def get_weather_chart_data_by_period(period):
+    """API endpoint để lấy dữ liệu biểu đồ theo thời gian (day/week/month)"""
+    try:
+        print(f"🔥 Sử dụng Firebase data cho chart với period: {period}")
+        firebase_data = get_firebase_weather_data()
+        
+        if not firebase_data:
+            print("⚠️ Firebase data empty for chart, falling back to default")
+            firebase_data = get_default_weather_data()
+        
+        if period == 'day':
+            # Last 24 hours - show 10 points
+            now = datetime.now()
+            start_time = now - timedelta(days=1)
+            filtered_data = [item for item in firebase_data if item.get('datetime', now) >= start_time]
+            chart_data = filtered_data[:10] if len(filtered_data) > 10 else filtered_data
+            
+            chart_data_dict = {
+                'timestamps': [item.get('datetime', '').strftime('%H:%M') for item in chart_data],
+                'dates': [item.get('datetime', '').strftime('%d/%m') for item in chart_data],
+                'temperature': [item.get('temperature', 0) for item in chart_data],
+                'humidity': [item.get('humidity', 0) for item in chart_data],
+                'pressure': [item.get('pressure', 0) for item in chart_data],
+                'rain': [item.get('rain', 0) for item in chart_data],
+                'gust_windSpd': [item.get('gust_windSpd', 0) for item in chart_data],
+                'gust_windDir': [item.get('gust_windDir', 0) for item in chart_data],
+                'sustain_windSpd': [item.get('sustain_windSpd', 0) for item in chart_data],
+                'sustain_windDir': [item.get('sustain_windDir', 0) for item in chart_data]
+            }
+            
+        elif period == 'week':
+            # Last 7 days - calculate daily averages
+            now = datetime.now()
+            daily_data = {}
+            
+            for item in firebase_data:
+                item_date = item.get('datetime', now).date()
+                if item_date not in daily_data:
+                    daily_data[item_date] = {
+                        'temperatures': [], 'humidities': [], 'pressures': [], 'rains': [],
+                        'gust_windSpds': [], 'gust_windDirs': [], 'sustain_windSpds': [], 'sustain_windDirs': []
+                    }
+                
+                daily_data[item_date]['temperatures'].append(item.get('temperature', 0))
+                daily_data[item_date]['humidities'].append(item.get('humidity', 0))
+                daily_data[item_date]['pressures'].append(item.get('pressure', 0))
+                daily_data[item_date]['rains'].append(item.get('rain', 0))
+                daily_data[item_date]['gust_windSpds'].append(item.get('gust_windSpd', 0))
+                daily_data[item_date]['gust_windDirs'].append(item.get('gust_windDir', 0))
+                daily_data[item_date]['sustain_windSpds'].append(item.get('sustain_windSpd', 0))
+                daily_data[item_date]['sustain_windDirs'].append(item.get('sustain_windDir', 0))
+            
+            # Get last 7 days and calculate averages
+            dates = sorted(daily_data.keys(), reverse=True)[:7]
+            dates.reverse()  # Show oldest to newest
+            
+            chart_data_dict = {
+                'timestamps': [date.strftime('%H:%M') for date in dates],  # Use time format for consistency
+                'dates': [date.strftime('%d/%m') for date in dates],
+                'temperature': [sum(daily_data[date]['temperatures']) / len(daily_data[date]['temperatures']) if daily_data[date]['temperatures'] else 0 for date in dates],
+                'humidity': [sum(daily_data[date]['humidities']) / len(daily_data[date]['humidities']) if daily_data[date]['humidities'] else 0 for date in dates],
+                'pressure': [sum(daily_data[date]['pressures']) / len(daily_data[date]['pressures']) if daily_data[date]['pressures'] else 0 for date in dates],
+                'rain': [sum(daily_data[date]['rains']) for date in dates],  # Total rain per day
+                'gust_windSpd': [sum(daily_data[date]['gust_windSpds']) / len(daily_data[date]['gust_windSpds']) if daily_data[date]['gust_windSpds'] else 0 for date in dates],
+                'gust_windDir': [sum(daily_data[date]['gust_windDirs']) / len(daily_data[date]['gust_windDirs']) if daily_data[date]['gust_windDirs'] else 0 for date in dates],
+                'sustain_windSpd': [sum(daily_data[date]['sustain_windSpds']) / len(daily_data[date]['sustain_windSpds']) if daily_data[date]['sustain_windSpds'] else 0 for date in dates],
+                'sustain_windDir': [sum(daily_data[date]['sustain_windDirs']) / len(daily_data[date]['sustain_windDirs']) if daily_data[date]['sustain_windDirs'] else 0 for date in dates]
+            }
+            
+        elif period == 'month':
+            # Last 7 months - calculate monthly averages
+            now = datetime.now()
+            monthly_data = {}
+            
+            for item in firebase_data:
+                item_month = item.get('datetime', now).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+                if item_month not in monthly_data:
+                    monthly_data[item_month] = {
+                        'temperatures': [], 'humidities': [], 'pressures': [], 'rains': [],
+                        'gust_windSpds': [], 'gust_windDirs': [], 'sustain_windSpds': [], 'sustain_windDirs': []
+                    }
+                
+                monthly_data[item_month]['temperatures'].append(item.get('temperature', 0))
+                monthly_data[item_month]['humidities'].append(item.get('humidity', 0))
+                monthly_data[item_month]['pressures'].append(item.get('pressure', 0))
+                monthly_data[item_month]['rains'].append(item.get('rain', 0))
+                monthly_data[item_month]['gust_windSpds'].append(item.get('gust_windSpd', 0))
+                monthly_data[item_month]['gust_windDirs'].append(item.get('gust_windDir', 0))
+                monthly_data[item_month]['sustain_windSpds'].append(item.get('sustain_windSpd', 0))
+                monthly_data[item_month]['sustain_windDirs'].append(item.get('sustain_windDir', 0))
+            
+            # Get last 7 months and calculate averages
+            months = sorted(monthly_data.keys(), reverse=True)[:7]
+            months.reverse()  # Show oldest to newest
+            
+            chart_data_dict = {
+                'timestamps': [month.strftime('%H:%M') for month in months],  # Use time format for consistency
+                'dates': [month.strftime('%m/%Y') for month in months],
+                'temperature': [sum(monthly_data[month]['temperatures']) / len(monthly_data[month]['temperatures']) if monthly_data[month]['temperatures'] else 0 for month in months],
+                'humidity': [sum(monthly_data[month]['humidities']) / len(monthly_data[month]['humidities']) if monthly_data[month]['humidities'] else 0 for month in months],
+                'pressure': [sum(monthly_data[month]['pressures']) / len(monthly_data[month]['pressures']) if monthly_data[month]['pressures'] else 0 for month in months],
+                'rain': [sum(monthly_data[month]['rains']) for month in months],  # Total rain per month
+                'gust_windSpd': [sum(monthly_data[month]['gust_windSpds']) / len(monthly_data[month]['gust_windSpds']) if monthly_data[month]['gust_windSpds'] else 0 for month in months],
+                'gust_windDir': [sum(monthly_data[month]['gust_windDirs']) / len(monthly_data[month]['gust_windDirs']) if monthly_data[month]['gust_windDirs'] else 0 for month in months],
+                'sustain_windSpd': [sum(monthly_data[month]['sustain_windSpds']) / len(monthly_data[month]['sustain_windSpds']) if monthly_data[month]['sustain_windSpds'] else 0 for month in months],
+                'sustain_windDir': [sum(monthly_data[month]['sustain_windDirs']) / len(monthly_data[month]['sustain_windDirs']) if monthly_data[month]['sustain_windDirs'] else 0 for month in months]
+            }
+            
+        else:
+            # Default to last 10 records
+            chart_data = firebase_data[:10] if len(firebase_data) > 10 else firebase_data
+            
+            chart_data_dict = {
+                'timestamps': [item.get('datetime', '').strftime('%H:%M') for item in chart_data],
+                'dates': [item.get('datetime', '').strftime('%d/%m') for item in chart_data],
+                'temperature': [item.get('temperature', 0) for item in chart_data],
+                'humidity': [item.get('humidity', 0) for item in chart_data],
+                'pressure': [item.get('pressure', 0) for item in chart_data],
+                'rain': [item.get('rain', 0) for item in chart_data],
+                'gust_windSpd': [item.get('gust_windSpd', 0) for item in chart_data],
+                'gust_windDir': [item.get('gust_windDir', 0) for item in chart_data],
+                'sustain_windSpd': [item.get('sustain_windSpd', 0) for item in chart_data],
+                'sustain_windDir': [item.get('sustain_windDir', 0) for item in chart_data]
+            }
+        
+        print(f"✅ Firebase chart data prepared: {len(chart_data_dict['timestamps'])} points for {period}")
+        return jsonify({
+            'success': True,
+            'data': chart_data_dict,
+            'source': 'firebase',
+            'period': period
+        })
+    except Exception as e:
+        print(f"❌ Error in get_weather_chart_data_by_period: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 @app.route('/api/data')
 def get_data():
