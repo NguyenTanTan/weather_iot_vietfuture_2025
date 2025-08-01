@@ -172,6 +172,9 @@ def get_weather_data():
             print("⚠️ Firebase data empty, falling back to default")
             firebase_data = get_default_weather_data()
         
+        # Sort data by datetime (newest first) for proper display
+        firebase_data.sort(key=lambda x: x.get('datetime', datetime.now()), reverse=True)
+        
         # Calculate statistics from Firebase data
         temps = [item.get('temperature', 0) for item in firebase_data]
         humidities = [item.get('humidity', 0) for item in firebase_data]
@@ -322,6 +325,9 @@ def get_weather_chart_data_by_period(period):
             start_time = now - timedelta(days=1)
             filtered_data = [item for item in firebase_data if item.get('datetime', now) >= start_time]
             chart_data = filtered_data[:10] if len(filtered_data) > 10 else filtered_data
+            
+            # Sort by datetime (oldest to newest) to match week/month format
+            chart_data.sort(key=lambda x: x.get('datetime', now))
             
             chart_data_dict = {
                 'timestamps': [item.get('datetime', '').strftime('%H:%M') for item in chart_data],

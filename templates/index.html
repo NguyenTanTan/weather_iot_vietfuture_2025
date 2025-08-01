@@ -947,7 +947,7 @@
             }
 
             let html = '';
-            data.slice(-10).reverse().forEach((item, index) => {
+            data.slice(0, 10).forEach((item, index) => {
                 const datetime = new Date(item.datetime).toLocaleString('vi-VN');
                 html += `
                     <div class="weather-item" style="animation-delay: ${index * 0.1}s;">
