@@ -103,10 +103,10 @@ def get_firebase_weather_data():
             try:
                 # Decode timestamp from push ID
                 timestamp = decode_firebase_timestamp(push_id)
-                if timestamp:                    
+                if timestamp:
                     dt = datetime.fromtimestamp(timestamp / 1000, tz=timezone.utc).astimezone(VN_TZ)
                 else:
-                    dt = datetime.now()
+                    dt = datetime.now(VN_TZ)
                 
                 # Extract weather data
                 weather_record = {
@@ -177,7 +177,7 @@ def get_weather_data():
             firebase_data = get_default_weather_data()
         
         # Sort data by datetime (newest first) for proper display
-        firebase_data.sort(key=lambda x: x.get('datetime', datetime.now()), reverse=True)
+        firebase_data.sort(key=lambda x: x.get('datetime', datetime.now(VN_TZ)), reverse=True)
         
         # Convert datetime objects to ISO string format for JSON serialization
         for item in firebase_data:
@@ -198,7 +198,7 @@ def get_weather_data():
             'avg_humidity': float(sum(humidities) / len(humidities)) if humidities else 0,
             'max_temperature': float(max(temps)) if temps else 0,
             'min_temperature': float(min(temps)) if temps else 0,
-            'last_update': firebase_data[0].get('datetime', datetime.now().isoformat())
+            'last_update': firebase_data[0].get('datetime', datetime.now(VN_TZ).isoformat())
         }
         
         print(f"✅ Firebase data processed: {len(firebase_data)} records")
