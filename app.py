@@ -330,10 +330,21 @@ def get_weather_chart_data_by_period(period):
         
         if period == 'day':
             # Last 24 hours - show 10 points
-            now = datetime.now()
+            now = datetime.now(VN_TZ)
             start_time = now - timedelta(days=1)
+            print(f"🔍 Day period: now={now}, start_time={start_time}")
+            print(f"🔍 Total firebase data: {len(firebase_data)} records")
+            
             filtered_data = [item for item in firebase_data if item.get('datetime', now) >= start_time]
+            print(f"🔍 Filtered data (last 24h): {len(filtered_data)} records")
+            
+            # If no data in last 24 hours, use last 10 records
+            if not filtered_data:
+                print("⚠️ No data in last 24h, using last 10 records")
+                filtered_data = firebase_data[:10] if len(firebase_data) > 10 else firebase_data
+            
             chart_data = filtered_data[:10] if len(filtered_data) > 10 else filtered_data
+            print(f"🔍 Final chart data: {len(chart_data)} records")
             
             # Sort by datetime (oldest to newest) to match week/month format
             chart_data.sort(key=lambda x: x.get('datetime', now))
@@ -353,7 +364,7 @@ def get_weather_chart_data_by_period(period):
             
         elif period == 'week':
             # Last 7 days - calculate daily averages
-            now = datetime.now()
+            now = datetime.now(VN_TZ)
             daily_data = {}
             
             for item in firebase_data:
@@ -392,7 +403,7 @@ def get_weather_chart_data_by_period(period):
             
         elif period == 'month':
             # Last 7 months - calculate monthly averages
-            now = datetime.now()
+            now = datetime.now(VN_TZ)
             monthly_data = {}
             
             for item in firebase_data:
