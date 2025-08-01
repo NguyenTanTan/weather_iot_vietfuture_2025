@@ -1,6 +1,5 @@
-Flask==2.2.5
-firebase-admin==6.2.0
-pandas==1.5.3
-python-dotenv==1.0.0
-gunicorn==20.1.0
-Werkzeug==2.2.3 
+Flask
+firebase-admin
+pandas
+python-dotenv
+gunicorn 
