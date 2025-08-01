@@ -3,7 +3,7 @@ import firebase_admin
 from firebase_admin import credentials, db
 import os
 from dotenv import load_dotenv
-import pandas as pd
+import csv
 from datetime import datetime, timedelta
 import json
 
@@ -80,16 +80,45 @@ db_ref = initialize_firebase()
 def load_weather_data():
     """Load weather data from CSV file"""
     try:
-        df = pd.read_csv('Firebase Data - Historical Data Final.csv')
-        # Convert timestamp to datetime
-        df['datetime'] = pd.to_datetime(df['Data timestamp'], unit='ms')
-        # Convert string numbers to float (handle comma decimal separator)
-        df['temperature'] = df['temperature'].astype(str).str.replace(',', '.').astype(float)
-        df['humidity'] = df['humidity'].astype(str).str.replace(',', '.').astype(float)
-        return df
+        data = []
+        with open('Firebase Data - Historical Data Final.csv', 'r', encoding='utf-8') as file:
+            reader = csv.DictReader(file)
+            for row in reader:
+                try:
+                    # Convert timestamp to datetime
+                    timestamp_ms = int(row['Data timestamp'])
+                    dt = datetime.fromtimestamp(timestamp_ms / 1000)
+                    
+                    # Convert string numbers to float (handle comma decimal separator)
+                    temp = float(str(row['temperature']).replace(',', '.'))
+                    hum = float(str(row['humidity']).replace(',', '.'))
+                    pressure = float(str(row['pressure']).replace(',', '.'))
+                    rain = float(str(row['rain']).replace(',', '.'))
+                    sustain_windSpd = float(str(row['sustain_windSpd']).replace(',', '.'))
+                    sustain_windDir = float(str(row['sustain_windDir']).replace(',', '.'))
+                    gust_windSpd = float(str(row['gust_windSpd']).replace(',', '.'))
+                    gust_windDir = float(str(row['gust_windDir']).replace(',', '.'))
+                    
+                    data.append({
+                        'datetime': dt,
+                        'temperature': temp,
+                        'humidity': hum,
+                        'pressure': pressure,
+                        'rain': rain,
+                        'sustain_windSpd': sustain_windSpd,
+                        'sustain_windDir': sustain_windDir,
+                        'gust_windSpd': gust_windSpd,
+                        'gust_windDir': gust_windDir
+                    })
+                except (ValueError, KeyError) as e:
+                    print(f"Error parsing row: {e}")
+                    continue
+        
+        print(f"✅ Loaded {len(data)} records from CSV")
+        return data
     except Exception as e:
         print(f"Error loading CSV: {e}")
-        return pd.DataFrame()
+        return []
 
 # Get weather data from Firebase Realtime Database
 def get_firebase_weather_data():
@@ -201,28 +230,45 @@ def get_weather_data():
         
         # Fallback to CSV data
         print("📄 Sử dụng CSV data")
-        df = load_weather_data()
-        if df.empty:
+        data = load_weather_data()
+        if not data:
             return jsonify({
                 'success': False,
                 'error': 'Không thể tải dữ liệu CSV'
             }), 500
         
-        # Get latest data
-        latest_data = df.tail(50).to_dict('records')
+        # Get latest data (last 50 records)
+        latest_data = data[-50:] if len(data) > 50 else data
         
         # Calculate statistics
-        stats = {
-            'total_records': len(df),
-            'latest_temperature': float(df['temperature'].iloc[-1]),
-            'latest_humidity': float(df['humidity'].iloc[-1]),
-            'latest_pressure': float(df['pressure'].iloc[-1]),
-            'avg_temperature': float(df['temperature'].mean()),
-            'avg_humidity': float(df['humidity'].mean()),
-            'max_temperature': float(df['temperature'].max()),
-            'min_temperature': float(df['temperature'].min()),
-            'last_update': df['datetime'].iloc[-1].strftime('%Y-%m-%d %H:%M:%S')
-        }
+        if data:
+            temperatures = [item['temperature'] for item in data]
+            humidities = [item['humidity'] for item in data]
+            pressures = [item['pressure'] for item in data]
+            
+            stats = {
+                'total_records': len(data),
+                'latest_temperature': float(data[-1]['temperature']),
+                'latest_humidity': float(data[-1]['humidity']),
+                'latest_pressure': float(data[-1]['pressure']),
+                'avg_temperature': float(sum(temperatures) / len(temperatures)),
+                'avg_humidity': float(sum(humidities) / len(humidities)),
+                'max_temperature': float(max(temperatures)),
+                'min_temperature': float(min(temperatures)),
+                'last_update': data[-1]['datetime'].strftime('%Y-%m-%d %H:%M:%S')
+            }
+        else:
+            stats = {
+                'total_records': 0,
+                'latest_temperature': 0,
+                'latest_humidity': 0,
+                'latest_pressure': 0,
+                'avg_temperature': 0,
+                'avg_humidity': 0,
+                'max_temperature': 0,
+                'min_temperature': 0,
+                'last_update': 'No data'
+            }
         
         print(f"✅ CSV data processed: {len(latest_data)} records")
         return jsonify({
@@ -276,27 +322,27 @@ def get_weather_chart_data():
         
         # Fallback to CSV data
         print("📄 Sử dụng CSV data cho chart")
-        df = load_weather_data()
-        if df.empty:
+        data = load_weather_data()
+        if not data:
             return jsonify({
                 'success': False,
                 'error': 'Không thể tải dữ liệu CSV'
             }), 500
         
         # Get last 100 records for chart
-        chart_data = df.tail(100)
+        chart_data = data[-100:] if len(data) > 100 else data
         
         # Prepare data for charts
         chart_data_dict = {
-            'timestamps': chart_data['datetime'].dt.strftime('%Y-%m-%d %I:%M %p').tolist(),
-            'temperature': chart_data['temperature'].tolist(),
-            'humidity': chart_data['humidity'].tolist(),
-            'pressure': chart_data['pressure'].tolist(),
-            'rain': chart_data['rain'].tolist(),
-            'gust_windSpd': chart_data['gust_windSpd'].tolist(),
-            'gust_windDir': chart_data['gust_windDir'].tolist(),
-            'sustain_windSpd': chart_data['sustain_windSpd'].tolist(),
-            'sustain_windDir': chart_data['sustain_windDir'].tolist()
+            'timestamps': [item['datetime'].strftime('%Y-%m-%d %I:%M %p') for item in chart_data],
+            'temperature': [item['temperature'] for item in chart_data],
+            'humidity': [item['humidity'] for item in chart_data],
+            'pressure': [item['pressure'] for item in chart_data],
+            'rain': [item['rain'] for item in chart_data],
+            'gust_windSpd': [item['gust_windSpd'] for item in chart_data],
+            'gust_windDir': [item['gust_windDir'] for item in chart_data],
+            'sustain_windSpd': [item['sustain_windSpd'] for item in chart_data],
+            'sustain_windDir': [item['sustain_windDir'] for item in chart_data]
         }
         
         print(f"✅ CSV chart data prepared: {len(chart_data_dict['timestamps'])} points")
@@ -354,8 +400,8 @@ def get_weather_summary():
         
         # Fallback to CSV data
         print("📄 Sử dụng CSV data cho summary")
-        df = load_weather_data()
-        if df.empty:
+        data = load_weather_data()
+        if not data:
             return jsonify({
                 'success': False,
                 'error': 'Không thể tải dữ liệu CSV'
@@ -363,29 +409,48 @@ def get_weather_summary():
         
         # Get today's data
         today = datetime.now().date()
-        today_data = df[df['datetime'].dt.date == today]
+        today_data = [item for item in data if item['datetime'].date() == today]
         
         if len(today_data) == 0:
             # If no data for today, get last 24 hours
             yesterday = datetime.now() - timedelta(days=1)
-            today_data = df[df['datetime'] >= yesterday]
+            today_data = [item for item in data if item['datetime'] >= yesterday]
         
-        summary = {
-            'current_temp': float(df['temperature'].iloc[-1]),
-            'current_humidity': float(df['humidity'].iloc[-1]),
-            'current_pressure': float(df['pressure'].iloc[-1]),
-            'today_high': float(today_data['temperature'].max()) if len(today_data) > 0 else 0,
-            'today_low': float(today_data['temperature'].min()) if len(today_data) > 0 else 0,
-            'today_avg_temp': float(today_data['temperature'].mean()) if len(today_data) > 0 else 0,
-            'today_avg_humidity': float(today_data['humidity'].mean()) if len(today_data) > 0 else 0,
-            'wind_speed': float(df['sustain_windSpd'].iloc[-1]),
-            'wind_direction': float(df['sustain_windDir'].iloc[-1]),
-            'rain_today': float(today_data['rain'].sum()) if len(today_data) > 0 else 0,
-            'gust_wind_speed': float(df['gust_windSpd'].iloc[-1]),
-            'gust_wind_direction': float(df['gust_windDir'].iloc[-1]),
-            'sustain_wind_direction': float(df['sustain_windDir'].iloc[-1]),
-            'last_update': df['datetime'].iloc[-1].strftime('%I:%M:%S %p')
-        }
+        if data:
+            latest = data[-1]
+            summary = {
+                'current_temp': float(latest['temperature']),
+                'current_humidity': float(latest['humidity']),
+                'current_pressure': float(latest['pressure']),
+                'today_high': float(max([item['temperature'] for item in today_data])) if today_data else 0,
+                'today_low': float(min([item['temperature'] for item in today_data])) if today_data else 0,
+                'today_avg_temp': float(sum([item['temperature'] for item in today_data]) / len(today_data)) if today_data else 0,
+                'today_avg_humidity': float(sum([item['humidity'] for item in today_data]) / len(today_data)) if today_data else 0,
+                'wind_speed': float(latest['sustain_windSpd']),
+                'wind_direction': float(latest['sustain_windDir']),
+                'rain_today': float(sum([item['rain'] for item in today_data])) if today_data else 0,
+                'gust_wind_speed': float(latest['gust_windSpd']),
+                'gust_wind_direction': float(latest['gust_windDir']),
+                'sustain_wind_direction': float(latest['sustain_windDir']),
+                'last_update': latest['datetime'].strftime('%I:%M:%S %p')
+            }
+        else:
+            summary = {
+                'current_temp': 0,
+                'current_humidity': 0,
+                'current_pressure': 0,
+                'today_high': 0,
+                'today_low': 0,
+                'today_avg_temp': 0,
+                'today_avg_humidity': 0,
+                'wind_speed': 0,
+                'wind_direction': 0,
+                'rain_today': 0,
+                'gust_wind_speed': 0,
+                'gust_wind_direction': 0,
+                'sustain_wind_direction': 0,
+                'last_update': 'No data'
+            }
         
         print(f"✅ CSV summary prepared: temp={summary['current_temp']}°C")
         return jsonify({
