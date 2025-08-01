@@ -1,4 +1,5 @@
 Flask
 firebase-admin
 python-dotenv
-gunicorn 
+gunicorn
+pytz 

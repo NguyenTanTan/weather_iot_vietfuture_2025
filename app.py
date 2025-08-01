@@ -3,13 +3,17 @@ import firebase_admin
 from firebase_admin import credentials, db
 import os
 from dotenv import load_dotenv
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import json
+import pytz
 
 # Load environment variables
 load_dotenv()
 
 app = Flask(__name__)
+
+# Vietnam timezone
+VN_TZ = pytz.timezone('Asia/Ho_Chi_Minh')
 
 # Firebase Push ID decoding constants
 PUSH_CHARS = '-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz'
@@ -99,8 +103,8 @@ def get_firebase_weather_data():
             try:
                 # Decode timestamp from push ID
                 timestamp = decode_firebase_timestamp(push_id)
-                if timestamp:
-                    dt = datetime.fromtimestamp(timestamp / 1000)
+                if timestamp:                    
+                    dt = datetime.fromtimestamp(timestamp / 1000, tz=timezone.utc).astimezone(VN_TZ)
                 else:
                     dt = datetime.now()
                 
@@ -134,7 +138,7 @@ def get_firebase_weather_data():
 # Default weather data when Firebase is not available
 def get_default_weather_data():
     """Return default weather data when Firebase is not available"""
-    now = datetime.now()
+    now = datetime.now(VN_TZ)
     data = []
     
     # Generate sample data for the last 30 days to test week/month views

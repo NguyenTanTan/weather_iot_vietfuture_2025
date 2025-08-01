@@ -948,21 +948,25 @@
 
             let html = '';
             data.slice(0, 10).forEach((item, index) => {
-                // Parse datetime string and format it properly
+                // Parse datetime string and format it properly with Vietnam timezone
                 let datetime;
                 try {
                     if (typeof item.datetime === 'string') {
-                        // Handle ISO string format
+                        // Handle ISO string format - force Vietnam timezone
                         datetime = new Date(item.datetime).toLocaleString('vi-VN', {
                             year: 'numeric',
                             month: '2-digit',
                             day: '2-digit',
                             hour: '2-digit',
                             minute: '2-digit',
-                            second: '2-digit'
+                            second: '2-digit',
+                            timeZone: 'Asia/Ho_Chi_Minh' // Force Vietnam timezone
                         });
                     } else {
-                        datetime = new Date(item.datetime).toLocaleString('vi-VN');
+                        const date = new Date(item.datetime);
+                        datetime = date.toLocaleString('vi-VN', {
+                            timeZone: 'Asia/Ho_Chi_Minh'
+                        });
                     }
                 } catch (e) {
                     datetime = 'Thời gian không xác định';
