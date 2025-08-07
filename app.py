@@ -3,7 +3,7 @@ import firebase_admin
 from firebase_admin import credentials, db
 import os
 from dotenv import load_dotenv
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, date
 import json
 import pytz
 
@@ -149,7 +149,7 @@ def get_default_weather_data():
             'temperature': 25.0 + (i % 10) - 5,  # Vary temperature
             'humidity': 60.0 + (i % 20),  # Vary humidity
             'pressure': 1013.25 + (i % 10) - 5,  # Vary pressure
-            'rain': (i % 3) * 2.5,  # Some rain days
+            'rain': round((i % 3) * 2.5 * 0.4, 0),  # Some rain days
             'sustain_windSpd': 5.0 + (i % 8),  # Vary wind speed
             'sustain_windDir': 180.0 + (i % 180),  # Vary wind direction
             'gust_windSpd': 8.0 + (i % 12),  # Vary gust wind speed
@@ -157,6 +157,28 @@ def get_default_weather_data():
         })
     
     return data
+
+def filter_today_data(weather_data):
+    """Filter weather data to only include today's records"""
+    today = date.today()
+    today_data = []
+    
+    for item in weather_data:
+        item_datetime = item.get('datetime')
+        if isinstance(item_datetime, datetime):
+            item_date = item_datetime.date()
+        elif isinstance(item_datetime, str):
+            try:
+                item_date = datetime.fromisoformat(item_datetime.replace('Z', '+00:00')).date()
+            except:
+                continue
+        else:
+            continue
+            
+        if item_date == today:
+            today_data.append(item)
+    
+    return today_data
 
 @app.route('/')
 def index():
@@ -184,22 +206,41 @@ def get_weather_data():
             if isinstance(item.get('datetime'), datetime):
                 item['datetime'] = item['datetime'].isoformat()
         
-        # Calculate statistics from Firebase data
-        temps = [item.get('temperature', 0) for item in firebase_data]
-        humidities = [item.get('humidity', 0) for item in firebase_data]
-        pressures = [item.get('pressure', 0) for item in firebase_data]
+        # Filter data for today only for stats calculation
+        today_data = filter_today_data(firebase_data)
         
-        stats = {
-            'total_records': len(firebase_data),
-            'latest_temperature': float(temps[0]) if temps else 0,
-            'latest_humidity': float(humidities[0]) if humidities else 0,
-            'latest_pressure': float(pressures[0]) if pressures else 0,
-            'avg_temperature': float(sum(temps) / len(temps)) if temps else 0,
-            'avg_humidity': float(sum(humidities) / len(humidities)) if humidities else 0,
-            'max_temperature': float(max(temps)) if temps else 0,
-            'min_temperature': float(min(temps)) if temps else 0,
-            'last_update': firebase_data[0].get('datetime', datetime.now(VN_TZ).isoformat())
-        }
+        # Calculate statistics from today's data only
+        if today_data:
+            temps = [item.get('temperature', 0) for item in today_data]
+            humidities = [item.get('humidity', 0) for item in today_data]
+            pressures = [item.get('pressure', 0) for item in today_data]
+            
+            stats = {
+                'total_records': len(firebase_data),
+                'today_records': len(today_data),
+                'latest_temperature': float(temps[0]) if temps else 0,
+                'latest_humidity': float(humidities[0]) if humidities else 0,
+                'latest_pressure': float(pressures[0]) if pressures else 0,
+                'avg_temperature': float(sum(temps) / len(temps)) if temps else 0,
+                'avg_humidity': float(sum(humidities) / len(humidities)) if humidities else 0,
+                'max_temperature': float(max(temps)) if temps else 0,
+                'min_temperature': float(min(temps)) if temps else 0,
+                'last_update': firebase_data[0].get('datetime', datetime.now(VN_TZ).isoformat())
+            }
+        else:
+            # No data for today
+            stats = {
+                'total_records': len(firebase_data),
+                'today_records': 0,
+                'latest_temperature': 0,
+                'latest_humidity': 0,
+                'latest_pressure': 0,
+                'avg_temperature': 0,
+                'avg_humidity': 0,
+                'max_temperature': 0,
+                'min_temperature': 0,
+                'last_update': 'Không có dữ liệu hôm nay'
+            }
         
         print(f"✅ Firebase data processed: {len(firebase_data)} records")
         return jsonify({
@@ -239,7 +280,7 @@ def get_weather_chart_data():
             'temperature': [item.get('temperature', 0) for item in chart_data],
             'humidity': [item.get('humidity', 0) for item in chart_data],
             'pressure': [item.get('pressure', 0) for item in chart_data],
-            'rain': [item.get('rain', 0) for item in chart_data],
+            'rain': [round(item.get('rain', 0) * 0.4, 0) for item in chart_data],
             'gust_windSpd': [item.get('gust_windSpd', 0) for item in chart_data],
             'gust_windDir': [item.get('gust_windDir', 0) for item in chart_data],
             'sustain_windSpd': [item.get('sustain_windSpd', 0) for item in chart_data],
@@ -272,23 +313,72 @@ def get_weather_summary():
             print("⚠️ Firebase data empty for summary, falling back to default")
             firebase_data = get_default_weather_data()
         
-        latest = firebase_data[0]
-        summary = {
-            'current_temp': float(latest.get('temperature', 0)),
-            'current_humidity': float(latest.get('humidity', 0)),
-            'current_pressure': float(latest.get('pressure', 0)),
-            'today_high': float(max([item.get('temperature', 0) for item in firebase_data])),
-            'today_low': float(min([item.get('temperature', 0) for item in firebase_data])),
-            'today_avg_temp': float(sum([item.get('temperature', 0) for item in firebase_data]) / len(firebase_data)),
-            'today_avg_humidity': float(sum([item.get('humidity', 0) for item in firebase_data]) / len(firebase_data)),
-            'wind_speed': float(latest.get('sustain_windSpd', 0)),
-            'wind_direction': float(latest.get('sustain_windDir', 0)),
-            'rain_today': float(sum([item.get('rain', 0) for item in firebase_data])),
-            'gust_wind_speed': float(latest.get('gust_windSpd', 0)),
-            'gust_wind_direction': float(latest.get('gust_windDir', 0)),
-            'sustain_wind_direction': float(latest.get('sustain_windDir', 0)),
-            'last_update': latest.get('datetime', datetime.now()).strftime('%I:%M:%S %p')
-        }
+        # Filter data for today only
+        today_data = filter_today_data(firebase_data)
+        
+        if today_data:
+            # Use latest data from today
+            latest = today_data[0]
+            
+            # Calculate today's statistics
+            today_temps = [item.get('temperature', 0) for item in today_data]
+            today_humidities = [item.get('humidity', 0) for item in today_data]
+            today_rains = [item.get('rain', 0) for item in today_data]
+            
+            summary = {
+                'current_temp': float(latest.get('temperature', 0)),
+                'current_humidity': float(latest.get('humidity', 0)),
+                'current_pressure': float(latest.get('pressure', 0)),
+                'today_high': float(max(today_temps)) if today_temps else 0,
+                'today_low': float(min(today_temps)) if today_temps else 0,
+                'today_avg_temp': float(sum(today_temps) / len(today_temps)) if today_temps else 0,
+                'today_avg_humidity': float(sum(today_humidities) / len(today_humidities)) if today_humidities else 0,
+                'wind_speed': float(latest.get('sustain_windSpd', 0)),
+                'wind_direction': float(latest.get('sustain_windDir', 0)),
+                'rain_today': round(sum([rain * 0.4 for rain in today_rains]), 0) if today_rains else 0,
+                'gust_wind_speed': float(latest.get('gust_windSpd', 0)),
+                'gust_wind_direction': float(latest.get('gust_windDir', 0)),
+                'sustain_wind_direction': float(latest.get('sustain_windDir', 0)),
+                'last_update': latest.get('datetime', datetime.now()).strftime('%I:%M:%S %p')
+            }
+        else:
+            # No data for today - use latest available data for current readings but zero for today's stats
+            if firebase_data:
+                latest = firebase_data[0]
+                summary = {
+                    'current_temp': float(latest.get('temperature', 0)),
+                    'current_humidity': float(latest.get('humidity', 0)),
+                    'current_pressure': float(latest.get('pressure', 0)),
+                    'today_high': 0,
+                    'today_low': 0,
+                    'today_avg_temp': 0,
+                    'today_avg_humidity': 0,
+                    'wind_speed': float(latest.get('sustain_windSpd', 0)),
+                    'wind_direction': float(latest.get('sustain_windDir', 0)),
+                    'rain_today': 0,
+                    'gust_wind_speed': float(latest.get('gust_windSpd', 0)),
+                    'gust_wind_direction': float(latest.get('gust_windDir', 0)),
+                    'sustain_wind_direction': float(latest.get('sustain_windDir', 0)),
+                    'last_update': 'Không có dữ liệu hôm nay'
+                }
+            else:
+                # No data at all
+                summary = {
+                    'current_temp': 0,
+                    'current_humidity': 0,
+                    'current_pressure': 0,
+                    'today_high': 0,
+                    'today_low': 0,
+                    'today_avg_temp': 0,
+                    'today_avg_humidity': 0,
+                    'wind_speed': 0,
+                    'wind_direction': 0,
+                    'rain_today': 0,
+                    'gust_wind_speed': 0,
+                    'gust_wind_direction': 0,
+                    'sustain_wind_direction': 0,
+                    'last_update': 'Không có dữ liệu'
+                }
         
         print(f"✅ Firebase summary prepared: temp={summary['current_temp']}°C")
         return jsonify({
@@ -355,7 +445,7 @@ def get_weather_chart_data_by_period(period):
                 'temperature': [item.get('temperature', 0) for item in chart_data],
                 'humidity': [item.get('humidity', 0) for item in chart_data],
                 'pressure': [item.get('pressure', 0) for item in chart_data],
-                'rain': [item.get('rain', 0) for item in chart_data],
+                'rain': [round(item.get('rain', 0) * 0.4, 0) for item in chart_data],
                 'gust_windSpd': [item.get('gust_windSpd', 0) for item in chart_data],
                 'gust_windDir': [item.get('gust_windDir', 0) for item in chart_data],
                 'sustain_windSpd': [item.get('sustain_windSpd', 0) for item in chart_data],
@@ -394,7 +484,7 @@ def get_weather_chart_data_by_period(period):
                 'temperature': [sum(daily_data[date]['temperatures']) / len(daily_data[date]['temperatures']) if daily_data[date]['temperatures'] else 0 for date in dates],
                 'humidity': [sum(daily_data[date]['humidities']) / len(daily_data[date]['humidities']) if daily_data[date]['humidities'] else 0 for date in dates],
                 'pressure': [sum(daily_data[date]['pressures']) / len(daily_data[date]['pressures']) if daily_data[date]['pressures'] else 0 for date in dates],
-                'rain': [sum(daily_data[date]['rains']) for date in dates],  # Total rain per day
+                'rain': [round(sum(daily_data[date]['rains']) * 0.4, 0) for date in dates],  # Total rain per day
                 'gust_windSpd': [sum(daily_data[date]['gust_windSpds']) / len(daily_data[date]['gust_windSpds']) if daily_data[date]['gust_windSpds'] else 0 for date in dates],
                 'gust_windDir': [sum(daily_data[date]['gust_windDirs']) / len(daily_data[date]['gust_windDirs']) if daily_data[date]['gust_windDirs'] else 0 for date in dates],
                 'sustain_windSpd': [sum(daily_data[date]['sustain_windSpds']) / len(daily_data[date]['sustain_windSpds']) if daily_data[date]['sustain_windSpds'] else 0 for date in dates],
@@ -433,7 +523,7 @@ def get_weather_chart_data_by_period(period):
                 'temperature': [sum(monthly_data[month]['temperatures']) / len(monthly_data[month]['temperatures']) if monthly_data[month]['temperatures'] else 0 for month in months],
                 'humidity': [sum(monthly_data[month]['humidities']) / len(monthly_data[month]['humidities']) if monthly_data[month]['humidities'] else 0 for month in months],
                 'pressure': [sum(monthly_data[month]['pressures']) / len(monthly_data[month]['pressures']) if monthly_data[month]['pressures'] else 0 for month in months],
-                'rain': [sum(monthly_data[month]['rains']) for month in months],  # Total rain per month
+                'rain': [round(sum(monthly_data[month]['rains']) * 0.4, 0) for month in months],  # Total rain per month
                 'gust_windSpd': [sum(monthly_data[month]['gust_windSpds']) / len(monthly_data[month]['gust_windSpds']) if monthly_data[month]['gust_windSpds'] else 0 for month in months],
                 'gust_windDir': [sum(monthly_data[month]['gust_windDirs']) / len(monthly_data[month]['gust_windDirs']) if monthly_data[month]['gust_windDirs'] else 0 for month in months],
                 'sustain_windSpd': [sum(monthly_data[month]['sustain_windSpds']) / len(monthly_data[month]['sustain_windSpds']) if monthly_data[month]['sustain_windSpds'] else 0 for month in months],
@@ -450,7 +540,7 @@ def get_weather_chart_data_by_period(period):
                 'temperature': [item.get('temperature', 0) for item in chart_data],
                 'humidity': [item.get('humidity', 0) for item in chart_data],
                 'pressure': [item.get('pressure', 0) for item in chart_data],
-                'rain': [item.get('rain', 0) for item in chart_data],
+                'rain': [round(item.get('rain', 0) * 0.4, 0) for item in chart_data],
                 'gust_windSpd': [item.get('gust_windSpd', 0) for item in chart_data],
                 'gust_windDir': [item.get('gust_windDir', 0) for item in chart_data],
                 'sustain_windSpd': [item.get('sustain_windSpd', 0) for item in chart_data],

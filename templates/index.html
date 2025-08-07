@@ -1013,16 +1013,27 @@
         }
 
         function updateWeatherSummary(summary) {
+            // Helper function to format values - show N/A for zero values that should have data
+            function formatValue(value, unit, isToday = false) {
+                if (isToday && (value === 0 || value === '0')) {
+                    return 'N/A';
+                }
+                return value + unit;
+            }
+            
+            // Current readings (always show, even if zero)
             document.getElementById('currentTemp').textContent = summary.current_temp + '°C';
             document.getElementById('currentHumidity').textContent = summary.current_humidity + '%';
             document.getElementById('currentPressure').textContent = summary.current_pressure + ' hPa';
             document.getElementById('windSpeed').textContent = summary.wind_speed + ' km/h';
             document.getElementById('windDirection').textContent = summary.wind_direction + '°';
-            document.getElementById('rainToday').textContent = summary.rain_today + ' mm';
+            
+            // Today's stats (show N/A if no data today)
+            document.getElementById('rainToday').textContent = formatValue(summary.rain_today, ' mm', true);
             document.getElementById('lastUpdate').textContent = summary.last_update;
             
-            // Update additional information
-            document.getElementById('rainInfo').textContent = summary.rain_today + ' mm';
+            // Update additional information (today's stats)
+            document.getElementById('rainInfo').textContent = formatValue(summary.rain_today, ' mm', true);
             document.getElementById('gustWindInfo').textContent = (summary.gust_wind_speed || 0) + ' km/h';
             document.getElementById('gustWindDirInfo').textContent = (summary.gust_wind_direction || 0) + '°';
             document.getElementById('sustainWindDirInfo').textContent = (summary.sustain_wind_direction || 0) + '°';
@@ -1035,10 +1046,18 @@
         }
 
         function updateStats(stats) {
+            // Helper function to format temperature stats
+            function formatTempStat(value, unit) {
+                if (stats.today_records === 0 || value === 0) {
+                    return 'N/A';
+                }
+                return value.toFixed(1) + unit;
+            }
+            
             document.getElementById('totalRecords').textContent = stats.total_records;
-            document.getElementById('todayHigh').textContent = stats.max_temperature + '°C';
-            document.getElementById('todayLow').textContent = stats.min_temperature + '°C';
-            document.getElementById('avgTemp').textContent = stats.avg_temperature.toFixed(1) + '°C';
+            document.getElementById('todayHigh').textContent = formatTempStat(stats.max_temperature, '°C');
+            document.getElementById('todayLow').textContent = formatTempStat(stats.min_temperature, '°C');
+            document.getElementById('avgTemp').textContent = formatTempStat(stats.avg_temperature, '°C');
         }
 
         function createCharts(chartData) {
